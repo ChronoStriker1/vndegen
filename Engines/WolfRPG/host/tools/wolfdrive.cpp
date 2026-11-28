@@ -164,6 +164,9 @@ int main(int argc, char **argv) {
                 std::printf("\n");
             }
             if (game.textEntry().active) std::printf("text entry\n");
+        } else if (cmd == "var") {
+            int i;
+            while (ss >> i) std::printf("var %d=%d\n", i, game.debugVariable(i));
         } else if (cmd == "hero") {
             const Actor &a = game.debugHero();
             std::printf("hero through %d visible %d opacity %d graphic \"%s\" transparent %d speed %d fixed %d route %d unit %d square %d\n", a.through, a.chara.visible, a.chara.opacity, a.chara.graphic.c_str(), game.debugTransparent(), a.speed, a.fixedDirection, a.route != nullptr, a.unit, a.square);

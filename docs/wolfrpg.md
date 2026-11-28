@@ -251,7 +251,12 @@ VNDegen from the joypad question through the prologue, its first battle and tuto
 book, the visual novel scenes at the Main Gate and the Sanctuary, the first dungeon (the Moon-Deceiving Forest: its three
 floors, eight battles with their results, the jump and the two-member battle tutorials and the scenes between them) to
 the story after it and the South Tower, where the menu's Battle Prep, Training, Skills and Members pages open; a save
-from its menu loads at the same place after a restart, and the PC under Wine loads it there too. Each part was compared
+from its menu loads at the same place after a restart, and the PC under Wine loads it there too. On the Linux host it
+plays on from there by the in-game map's objectives: to the North Tower through the East Tower and its corridors, the
+scene on the North Tower's second floor, back to the South Tower and the "Unwanted Deathmatch" event on its bridge,
+whose battle (a magic tutorial against a 30,000 HP enemy) runs with its turns, enemy actions, magic selection and
+retries; equipping a sword in Battle Prep works. That battle wasn't won with scripted input, so the story after it
+hasn't been played. Each part was compared
 with the game under Wine. Getting there needed, beyond the archives:
 
 - Conditions run their else case whenever the branch has one, also without the else flag; its tutorial body text sits
@@ -362,8 +367,8 @@ shot, save, load, pics, sys, state), which makes long play-throughs against the 
   picture again with its opacity kept, and up to 0.41.6 the face vanished and the map showed through her bust (#179).
 - System variable 115, the engine version the standard systems read, is set to 2.24 for Shift-JIS games and 3.28 for
   UTF-8 ones, since no Game.dat field is known to hold the real one.
-- False Myth 2: past the South Tower after the first dungeon it hasn't been played in VNDegen, and no shop has been
-  reached. The party command's other specials (warping the party to the hero, sync, remembering graphics, the
+- False Myth 2: the story past the "Unwanted Deathmatch" battle at the South Tower hasn't been played in VNDegen, and no
+  shop has been reached. The party command's other specials (warping the party to the hero, sync, remembering graphics, the
   caterpillar switch) aren't run. No point was reached where the party is transparent and the menu can save, so a save
   with the hero hidden hasn't been compared with the PC.
 - Whole-tile games keep the old rules: a tile blocks only when all four of its passability bits are set, events placed
@@ -371,8 +376,10 @@ shot, save, load, pics, sys, state), which makes long play-throughs against the 
   them (its specification page's 0.5-tile wider touch) haven't been compared with the PC. In half-tile games a whole
   step from a half position, which the PC refuses (a False Myth 2 save edited to whole steps at 47,45 can turn but not
   walk), isn't refused, and a character's box is checked only where its step ends.
-- False Myth 2's dungeons and battles still hitch for a moment every few seconds in the Mac app and the iPad simulator.
-  The hitches are in drawing a few large sprite sheets while macOS has compressed much of the app's memory
-  (`docs/frame-rate.md`); a Mac or iPad with memory to spare hasn't been measured.
+- False Myth 2's dungeons and battles still hitch for a moment every few seconds in the Mac app on the build Mac. A
+  step that takes 100 to 300 ms there uses only 8 to 13 ms of the main thread's CPU time, as a normal step does, so the
+  thread is waiting rather than working: the mini ran at load 15 to 21 from other threads' compilers during every
+  measurement, with the app in the background behind a locked screen (`docs/frame-rate.md`). A Mac at rest wasn't
+  available to measure.
 - Game.dat's language byte is read only as English (5) or Japanese; the other languages' values aren't known.
 - Of the effect command's map effects only the zoom is drawn; the library uses no other.
