@@ -131,6 +131,24 @@ int main() {
         assert(p.game.choice().active && p.game.choice().items.size() == 2);
     }
     {
+        Player p(root);
+        p.loadSlot(2);
+        p.walk(wolf::KeyDown, 150);
+        p.tap(wolf::KeyConfirm);
+        p.run(100);
+        p.tap(wolf::KeyConfirm);
+        p.run(300);
+        p.tap(wolf::KeyCancel);
+        p.run(60);
+        p.tap(wolf::KeyCancel);
+        p.run(60);
+        assert(p.game.mapId() == 57 && p.game.debugHero().through);
+        p.loadSlot(2);
+        assert(!p.game.debugHero().through);
+        p.walk(wolf::KeyDown, 150);
+        assert((p.at() == std::array<int, 2>{44, 52}));
+    }
+    {
         wolf::SaveFile whole = wolf::parseSave(pcSave);
         whole.party.hero.v78 = 2;
         writeFile(root / "Save" / "SaveData04.sav", wolf::serializeSave(whole));
