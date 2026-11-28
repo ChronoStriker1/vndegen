@@ -1024,12 +1024,13 @@ void field_draw(SG *g) {
     double t0 = now_ms();
     Field *f = &g->field;
     View *v = g->r3.view;
-    r3_begin(&g->r3, g->fb, v && v->ready && v->look.sky == 0 && v->look.sun ? 0xffffffffu : 0xff000000u);
+    bool skyView = v && v->ready && v->look.sky == 0 && v->look.sun && !(v->look.hasCamera && v->look.cameraKind == 1);
+    r3_begin(&g->r3, g->fb, skyView ? 0xffffffffu : 0xff000000u);
     if (!f->loaded || !v || !v->ready) return;
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
-    if (v->look.sky == 0 && v->look.sun && !(v->look.hasCamera && v->look.cameraKind == 1)) draw_sky(g, v);
+    if (skyView) draw_sky(g, v);
     if (g->r3.x->shadow.base) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)
