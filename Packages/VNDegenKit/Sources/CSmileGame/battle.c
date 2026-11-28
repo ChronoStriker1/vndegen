@@ -115,7 +115,7 @@ typedef struct Battle {
     View *fieldView;
     ShadowMap fieldShadow;
     bool fieldShadowOn;
-    float fieldLight[9], fieldAnimU;
+    float fieldLight[9], fieldModelLight[6], fieldAnimU;
 } Battle;
 
 static struct {
@@ -1192,6 +1192,8 @@ static void restore_field(Battle *b) {
     memcpy(x->amb, b->fieldLight, sizeof x->amb);
     memcpy(x->sun, b->fieldLight + 3, sizeof x->sun);
     memcpy(x->sunDir, b->fieldLight + 6, sizeof x->sunDir);
+    memcpy(x->modelAmb, b->fieldModelLight, sizeof x->modelAmb);
+    memcpy(x->modelSun, b->fieldModelLight + 3, sizeof x->modelSun);
     x->animU = b->fieldAnimU;
 }
 
@@ -1258,6 +1260,8 @@ static void setup_stage(Battle *b) {
     memcpy(b->fieldLight, x->amb, sizeof x->amb);
     memcpy(b->fieldLight + 3, x->sun, sizeof x->sun);
     memcpy(b->fieldLight + 6, x->sunDir, sizeof x->sunDir);
+    memcpy(b->fieldModelLight, x->modelAmb, sizeof x->modelAmb);
+    memcpy(b->fieldModelLight + 3, x->modelSun, sizeof x->modelSun);
     b->fieldAnimU = x->animU;
     g->r3.view = NULL;
     memset(&x->shadow, 0, sizeof x->shadow);
@@ -1286,6 +1290,11 @@ static void setup_stage(Battle *b) {
                 }
         }
         if (loaded) {
+            memcpy(x->amb, b->fieldLight, sizeof x->amb);
+            memcpy(x->sun, b->fieldLight + 3, sizeof x->sun);
+            memcpy(x->sunDir, b->fieldLight + 6, sizeof x->sunDir);
+            memcpy(x->modelAmb, b->fieldModelLight, sizeof x->modelAmb);
+            memcpy(x->modelSun, b->fieldModelLight + 3, sizeof x->modelSun);
             cx = s->hasCenter ? s->centerX : g->field.map.w / 2;
             cz = s->hasCenter ? s->centerZ : g->field.map.h / 2;
         }
