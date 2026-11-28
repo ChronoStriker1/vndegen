@@ -745,7 +745,7 @@ void Game::update(const Input &input) {
     // An event that starts on touching the hero also starts while the hero stands on it. The manual's specification
     // page has touch events checked every frame with the autorun ones, so a hero placed onto such an event starts it.
     if (threads_.empty() && !hero_.moving()) {
-        if (halfSteps()) touchHalf(4, 0, 0, true);
+        if (halfSteps()) touchHalf(4, 0, 0, true, true);
         else eventAt(hero_.tx(), hero_.ty(), 4, true);
     }
     if (threads_.empty()) {

@@ -149,9 +149,10 @@ bool Game::eventSolid(const MapEventState &e) const {
     return boxBlocked(a, a.px, a.py);
 }
 
-bool Game::touchHalf(int trigger, int dir, int reach, bool startIt) {
-    int hero[4];
-    actorBox(hero_, hero_.px + dirX(dir) * reach, hero_.py + dirY(dir) * reach, hero);
+bool Game::touchHalf(int trigger, int dir, int reach, bool onTop, bool startIt) {
+    int here[4], ahead[4];
+    actorBox(hero_, hero_.px, hero_.py, here);
+    actorBox(hero_, hero_.px + dirX(dir) * reach, hero_.py + dirY(dir) * reach, ahead);
     for (size_t i = 0; i < events_.size(); i++) {
         auto &e = events_[i];
         if (e.page < 0) continue;
@@ -159,12 +160,9 @@ bool Game::touchHalf(int trigger, int dir, int reach, bool startIt) {
         if (pg.trigger != trigger || pg.commands.size() <= 1) continue;
         int area[4];
         eventArea(e, area);
-        if (!overlaps(hero, area)) continue;
-        if (reach) {
-            if (!eventSolid(e)) continue;
-        } else if (trigger != 4 && (hero[0] < area[0] || hero[2] > area[2])) {
-            continue;
-        }
+        bool on = onTop && overlaps(here, area) && (trigger == 4 || (here[0] >= area[0] && here[2] <= area[2]));
+        bool front = reach && overlaps(ahead, area) && eventSolid(e);
+        if (!on && !front) continue;
         if (startIt) {
             Thread t;
             startPage(int(i), t);
@@ -395,7 +393,7 @@ bool Game::eventAt(int x, int y, int trigger, bool startIt) {
 
 void Game::checkTouch(int x, int y, bool heroMoved) {
     if (!heroMoved) return;
-    if (halfSteps()) touchHalf(3, 0, 0, true);
+    if (halfSteps()) touchHalf(3, 0, 0, true, true);
     else eventAt(x, y, 3, true);
 }
 
@@ -467,9 +465,9 @@ void Game::heroControl() {
         // The event on the hero's tile, then the one in front, then one across a counter.
         int facing = hero_.chara.direction;
         if (halfSteps()) {
-            if (touchHalf(0, 0, 0, true) || touchHalf(0, facing, 1, true)) return;
+            if (touchHalf(0, facing, 1, true, true)) return;
             int cx = (hero_.px + 1 + dirX(facing) * 2) >> 1, cy = (hero_.py + 1 + dirY(facing) * 2) >> 1;
-            if ((tileFlags(cx, cy) & 0x80) && touchHalf(0, facing, 3, true)) return;
+            if ((tileFlags(cx, cy) & 0x80) && touchHalf(0, facing, 3, false, true)) return;
         } else {
             int fx = hero_.tx() + dirX(facing), fy = hero_.ty() + dirY(facing);
             if (eventAt(hero_.tx(), hero_.ty(), 0, true) || eventAt(fx, fy, 0, true)) return;
@@ -479,7 +477,7 @@ void Game::heroControl() {
     if (dir) {
         if (!step(hero_, dir)) {
             // Walking into an event that starts on touch starts it.
-            if (halfSteps()) touchHalf(3, dir, 1, true) || touchHalf(4, dir, 1, true);
+            if (halfSteps()) touchHalf(3, dir, 1, false, true) || touchHalf(4, dir, 1, false, true);
             else eventAt(hero_.tx() + dirX(dir), hero_.ty() + dirY(dir), 3, true);
         }
     }

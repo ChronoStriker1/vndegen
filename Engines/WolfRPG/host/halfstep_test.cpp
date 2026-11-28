@@ -122,6 +122,15 @@ int main() {
         assert(p.game.heroTile()[2] == 2);
     }
     {
+        Player p(root);
+        p.loadSlot(2);
+        p.walk(wolf::KeyDown, 150);
+        assert((p.at() == std::array<int, 2>{44, 52}));
+        p.tap(wolf::KeyConfirm);
+        p.run(100);
+        assert(p.game.choice().active && p.game.choice().items.size() == 2);
+    }
+    {
         wolf::SaveFile whole = wolf::parseSave(pcSave);
         whole.party.hero.v78 = 2;
         writeFile(root / "Save" / "SaveData04.sav", wolf::serializeSave(whole));

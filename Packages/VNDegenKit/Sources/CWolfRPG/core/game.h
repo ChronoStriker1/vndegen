@@ -462,7 +462,7 @@ private:
     bool canMoveHalf(const Actor &a, int dir) const;
     void eventArea(const MapEventState &e, int box[4]) const;
     bool eventSolid(const MapEventState &e) const;
-    bool touchHalf(int trigger, int dir, int reach, bool startIt);
+    bool touchHalf(int trigger, int dir, int reach, bool onTop, bool startIt);
     void placeEventsOnEntry();
     bool step(Actor &a, int dir);                  // starts a step; false when blocked
     void turn(Actor &a, int dir);
