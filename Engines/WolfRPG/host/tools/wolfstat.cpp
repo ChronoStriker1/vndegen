@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
             for (auto &ev : m.events) {
                 std::printf("event %d \"%s\" at %d,%d\n", ev.id, ev.name.c_str(), ev.x, ev.y);
                 for (auto &pg : ev.pages) {
-                    std::printf(" page trigger %d graphic \"%s\" conds", pg.trigger, pg.graphic.c_str());
+                    std::printf(" page trigger %d graphic \"%s\" chip %d range %d,%d conds", pg.trigger, pg.graphic.c_str(), pg.chip, pg.rangeX, pg.rangeY);
                     for (int i = 0; i < 4; i++) std::printf(" [%d %d %d]", pg.condOps[i], pg.condVars[i], pg.condValues[i]);
                     std::printf("\n");
                     dump(pg.commands);

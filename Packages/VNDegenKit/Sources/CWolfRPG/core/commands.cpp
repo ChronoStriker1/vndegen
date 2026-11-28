@@ -505,8 +505,8 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
     int tile = gameDat_.tileSize();
     if (exec == 0x10) {  // character
         const Actor *a = actorFor(value(c.arg(2), t), t);
-        if (!a) return;
-        switch (info) {
+        switch (a ? info : -1) {
+            case -1: v = -1; break;
             case 0: v = a->tx; break;
             case 1: v = a->ty; break;
             case 2: v = a->tx * 2; break;
@@ -541,6 +541,12 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
             }
             case 16: v = a->chara.pattern; break;
             case 17: v = a->moving(); break;
+            case 20: {
+                v = a->chara.chip >= 0 ? a->chara.chip + 1 : 0;
+                for (auto &e : events_)
+                    if (&e.actor == a && e.page < 0) v = -1;
+                break;
+            }
             default: v = 0; break;
         }
     } else if (exec == 0x20) {  // map position
@@ -556,11 +562,11 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                     if (e.page >= 0 && e.actor.tx == x && e.actor.ty == y) v = e.data->id;
                 break;
             }
-            case 2: v = (tileFlags(x, y) & 0x0F) == 0x0F ? 0 : 1; break;
+            case 2: v = (tileFlags(x, y) & 0x0F) == 0x0F ? 1 : 0; break;
             case 3: {
-                v = (tileFlags(x, y) & 0x0F) == 0x0F ? 0 : 1;
+                v = (tileFlags(x, y) & 0x0F) == 0x0F ? 1 : 0;
                 for (auto &e : events_)
-                    if (e.page >= 0 && e.actor.tx == x && e.actor.ty == y && !e.actor.through) v = 0;
+                    if (e.page >= 0 && e.actor.tx == x && e.actor.ty == y && !e.actor.through) v = 1;
                 break;
             }
             case 4: case 5: case 6: case 7: {
@@ -570,7 +576,8 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                     for (layer = map_->layers - 1; layer > 0 && map_->tile(layer, x, y) == 0; layer--) {}
                 }
                 // A Wolf RPG Editor 3.5 map may have fewer than three layers; a layer it lacks reads as empty.
-                v = layer < map_->layers ? map_->tile(layer, x, y) : 0;
+                int32_t raw = layer < map_->layers ? map_->tile(layer, x, y) : 0;
+                v = raw >= 100000 ? raw / 100000 : raw > 0 ? raw + 32 : 0;
                 break;
             }
             default: {  // tile tags
@@ -599,7 +606,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                 case 1: v = int(p.y.value()); break;
                 case 2: v = p.imageW / std::max(1, p.divX); break;
                 case 3: v = p.imageH / std::max(1, p.divY); break;
-                case 4: v = p.pattern; break;
+                case 4: v = p.shownPattern(); break;
                 case 5: v = int(p.opacity.value()); break;
                 case 6: v = int(p.angle.value()); break;
                 case 7: case 11: v = int(p.zoomX.value()); break;
@@ -624,6 +631,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
             case 13: v = eventUnderMouse(); break;
             case 20: v = mouseX_; break;
             case 21: v = mouseY_; break;
+            case 24: v = gameDat_.language(); break;
             case 14: {
                 const auto &call = t.stack.back();
                 v = call.mapEvent < 0 || call.map != map_ ? -1 : events_[call.mapEvent].data->id;
@@ -970,6 +978,11 @@ void Game::effectCommand(Thread &t, const Command &c) {
             auto it = pictures_.find(n);
             if (it == pictures_.end()) continue;
             Picture &p = it->second;
+            if (flags & 0x100) {
+                if (type == 0x70) p.blur = std::clamp(a1, 0, 16);
+                else unsupported(c);
+                continue;
+            }
             switch (type) {
                 case 0x00:
                     p.flash = {a1, a2, a3};
@@ -1002,14 +1015,28 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.flickerFrames = frames;
                     p.flickerInterval = std::max(1, a1);
                     break;
+                case 0xB0:
+                    p.shift2X = a1;
+                    p.shift2Y = a2;
+                    break;
+                case 0xC0:
+                    p.fixZoomX.set(a1, frames);
+                    p.fixZoomY.set(a2, frames);
+                    break;
+                case 0xD0: p.fixAngle.set(a1, frames); break;
+                case 0xE0: p.fixOpacity.set(a1, frames); break;
                 case 0x80: case 0x90: case 0xA0:  // animate the pattern
+                    if (frames <= 0) {
+                        p.autoPatternMode = 0;
+                        break;
+                    }
                     p.autoPatternMode = (type - 0x80) / 0x10 + 1;
                     p.autoFrom = a1;
                     p.autoTo = a2;
                     p.autoInterval = std::max(1, frames);
                     p.autoTimer = 0;
                     p.autoDir = a2 >= a1 ? 1 : -1;
-                    p.pattern = a1;
+                    p.autoPattern = a1;
                     break;
                 default:
                     unsupported(c);

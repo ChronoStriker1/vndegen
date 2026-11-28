@@ -41,6 +41,7 @@ private:
         PictureKind kind = PictureKind::None;
         std::string source;
         int w = 0, h = 0;
+        int blur = 0;
         float offsetX = 0, offsetY = 0;
         Bitmap bitmap;
     };

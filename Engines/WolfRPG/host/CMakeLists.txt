@@ -22,7 +22,7 @@ target_include_directories(wolfrpg PUBLIC ${RUNTIME}/core ${RUNTIME}/include ${S
 target_compile_definitions(wolfrpg PUBLIC WOLF_FONTS_DIR="${SHARED}/fonts")
 target_link_libraries(wolfrpg PUBLIC PkgConfig::FREETYPE pthread)
 
-foreach(tool wolfstat wolfunpack wolfrun wolfplay wolfaudio wolfsave)
+foreach(tool wolfstat wolfunpack wolfrun wolfplay wolfaudio wolfsave wolfdrive)
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tools/${tool}.cpp)
     add_executable(${tool} tools/${tool}.cpp)
     target_link_libraries(${tool} PRIVATE wolfrpg)

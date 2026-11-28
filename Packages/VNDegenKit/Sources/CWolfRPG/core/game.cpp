@@ -509,6 +509,12 @@ std::string Game::expandText(const std::string &text, const Thread *t) const {
             int n = number(i + 2);
             if (n >= 0 && n < int(normal_.size())) out += std::to_string(normal_[n]);
             i = close;
+        } else if (i + 3 < text.size() && text[i + 1] == 'v' && text[i + 2] >= '1' && text[i + 2] <= '9' && text[i + 3] == '[') {
+            int n = number(i + 3);
+            Thread copy = t ? *t : Thread{};
+            if (n >= 0 && n < 100000)
+                out += std::to_string(const_cast<Game *>(this)->readVar(2100000 + (text[i + 2] - '1') * 100000 + n, copy));
+            i = close;
         } else if (code("s")) {
             int n = number(i + 2);
             if (n >= 0 && n < int(strings_.size())) out += strings_[n];
@@ -713,7 +719,10 @@ void Game::update(const Input &input) {
         } else if (message_.shown < message_.total) {
             if (advance) message_.shown = message_.total;
             else message_.shown++;
-        } else if (advance) {
+            for (auto [from, to] : message_.instantRanges)
+                if (message_.shown >= from && message_.shown < to) message_.shown = to;
+            if (message_.shown == message_.total && message_.autoClose) message_.active = false;
+        } else if (advance || message_.autoClose) {
             message_.active = false;
         }
         // The press that finishes or closes a message is used up, so it doesn't also talk to the event in front.
@@ -808,19 +817,21 @@ void Game::updatePictures() {
         for (Tween *tw : {&p.x, &p.y, &p.opacity, &p.zoomX, &p.zoomY, &p.angle, &p.r, &p.g, &p.b, &p.effectZoom, &p.effectZoomX,
                           &p.effectZoomY})
             tw->step();
+        for (Tween &tw : p.corners) tw.step();
+        for (Tween *tw : {&p.fixZoomX, &p.fixZoomY, &p.fixAngle, &p.fixOpacity}) tw->step();
         if (p.autoPatternMode && ++p.autoTimer >= p.autoInterval) {
             p.autoTimer = 0;
-            int next = p.pattern + p.autoDir;
+            int next = p.autoPattern + p.autoDir;
             int lo = std::min(p.autoFrom, p.autoTo), hi = std::max(p.autoFrom, p.autoTo);
             if (next < lo || next > hi) {
                 if (p.autoPatternMode == 1) p.autoPatternMode = 0;
                 else if (p.autoPatternMode == 2) next = p.autoFrom;
                 else {
                     p.autoDir = -p.autoDir;
-                    next = p.pattern + p.autoDir;
+                    next = p.autoPattern + p.autoDir;
                 }
             }
-            if (p.autoPatternMode) p.pattern = next;
+            if (p.autoPatternMode) p.autoPattern = next;
         }
         if (p.shakeFrames > 0) {
             p.shakeFrames--;

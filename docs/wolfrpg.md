@@ -98,7 +98,9 @@ A message draws only its text, at the top left that system variables 1 and 2 giv
 engine has no message window or face of its own: the manual's message page says a game's common events draw them, and
 the standard systems' message window event does, reading the face number that `@n` at the start of a message puts in
 system variable 0. System string 25 keeps the last message, which Milky Quest shows in a text picture of its own after
-it moves the engine's text off the screen. Up to 0.23.3 the runtime drew a window and face of its own over the game's,
+it moves the engine's text off the screen. System strings 26 and 27 go before and after every message's text, and in a
+message `\>` shows what follows at once up to `\<`, and `\^` closes the message without a key, as the manual's system
+variable and special code pages say. False Myth 2 skips its scenes by putting `\>` and `\^` there while X is held. Up to 0.23.3 the runtime drew a window and face of its own over the game's,
 which showed as a faint second window edge in Succubus Prison and Drain Dungeon.
 
 Text uses a font file the game ships whose family name matches the one Game.dat names, then VNDegen's Windows font pack
@@ -114,17 +116,34 @@ draws what they use, following the picture page of the official manual:
 - Text pictures report their laid-out size, which the standard systems read to centre text and to shrink long names.
   They align with `<L>`, `<C>` and `<R>`, which apply to the rest of their line and the lines after; `\ax[n]` at the end
   of a line widens the text so that a later right-aligned line lines up with it. `\space[n]`, `\-[n]`, `\E`, `\N`,
-  `\wE[n]`, `\cE[n]` and `\m[n]` change line spacing, letter spacing, outlines and line height. An outlined character
-  advances by twice the outline's width, as on the PC: False Myth 2's text with `\E` runs about 2 pixels wider per
-  character there, and its labels' `\-[06]` with `\wE[03]` keep their natural width. A size code before any character
-  sets that line's height.
+  `\wE[n]`, `\cE[n]` and `\m[n]` change line spacing, letter spacing, outlines and line height. `\E` outlines at width
+  1 and `\wE[n]` at width n; a later `\E` goes back to 1, as False Myth 2's dungeon name shows on the PC. An outlined
+  character advances by twice the outline's width, as on the PC: False Myth 2's text with `\E` runs about 2 pixels wider
+  per character there, and its labels' `\-[06]` with `\wE[03]` keep their natural width. A size code before any
+  character sets that line's height. `\img[file]` and `\imgS[file]` draw an image from the Data folder in the text at
+  its own size, scaled by `\isize[n]` percent, and `\v1[n]` to `\v9[n]` give spare variables.
+- Text has a dark shadow only while system variable 21 is 1 or more, that many pixels down and right, as the manual's
+  system variable page says. The standard systems set it to 1; False Myth 2 leaves it at 0, and the PC draws its text
+  without one.
 - Wolf draws 320 by 240 games at twice the size, so in those games `\ax`, `\ay`, `\mx`, `\my` and `\-` count in half
   pixels, as the standard systems' own layout assumes.
 - Pictures place by the anchors the games use (top left, centre, bottom left, top right, bottom right, top centre),
   move relative to where they are, keep their anchor, size and blend mode on a move, keep their
   zoom or colour when the command says so, and take the effect command's draw position shift and colour pulse. A
   negative zoom mirrors a picture about its anchor. A picture shown from `<SCREENSHOT>` holds the screen as last drawn.
-  The effect command's flash adds its colour and fades back over its frames.
+  The effect command's flash adds its colour and fades back over its frames. Its types 0xB0 to 0xE0 are the manual's
+  draw shift before zoom, zoom correction (100 based, per direction), angle correction and opacity correction, told
+  apart by how False Myth 2 uses them; each eases over the command's frames, and the variable command still reads the
+  picture's own values. Its second set's 0x70 (the 0x100 flag) blurs the picture by 1 to 16: three box blur passes of
+  half that radius come close to the PC's 8 behind False Myth 2's tutorial panels.
+- The effect command's automatic pattern switching animates a pattern of its own: when a single run ends, or a run of 0
+  frames stops it, the picture shows the pattern its picture commands gave it again, as the manual's effect page says.
+  False Myth 2's enemies idle in a loop and stop it to show a hurt pose; keeping the loop's frame drew a different
+  monster that shares the sheet. A divided picture at pattern 0 draws nothing.
+- Showing a picture again keeps the effect command's effects on it. False Myth 2's dungeon floor objects take their zoom
+  from an effect set on placeholders before the real images are shown in them.
+- Free-form pictures (the four-corner flag, 0x4000000) draw their pattern into the quadrilateral the position and fields
+  19 to 24 give, as two triangles; a move with the flag moves the corners. False Myth 2's skill chart is such a diamond.
 - A picture command over a range (move, erase, delay reset) reaches every shown picture in it, however wide the range:
   False Myth 2's title erases 1 to 999999.
 
@@ -207,9 +226,11 @@ safe: ANGEL QUEST's engine (version 123) closes when it loads a save holding a p
 
 False Myth 2 (Wolf RPG Editor 3.343) is an action-battle RPG made of 42 crypt version 0x14B archives. It plays in
 VNDegen from the joypad question through the prologue, its first battle and tutorial panels, the title, the config
-book, the visual novel scenes at the Main Gate and the Sanctuary, where the player walks, opens the menu and saves, to
-the first dungeon's tutorial panels; a save from its menu loads at the same place after a restart.
-Each part was compared with the game under Wine. Getting there needed, beyond the archives:
+book, the visual novel scenes at the Main Gate and the Sanctuary, the first dungeon (the Moon-Deceiving Forest: its three
+floors, eight battles with their results, the jump and the two-member battle tutorials and the scenes between them) to
+the story after it and the South Tower, where the menu's Battle Prep, Training, Skills and Members pages open; a save
+from its menu loads at the same place after a restart, and the PC under Wine loads it there too. Each part was compared
+with the game under Wine. Getting there needed, beyond the archives:
 
 - Conditions run their else case whenever the branch has one, also without the else flag; its tutorial body text sits
   in such a case.
@@ -232,7 +253,23 @@ Each part was compared with the game under Wine. Getting there needed, beyond th
 - Pictures at opacity 0 aren't decoded. Its battles keep a dozen hidden sprite sheets of up to 5760 by 3240 pixels,
   more than the image cache holds, and decoding them every frame took over 500 ms a frame.
 
+- The variable command's "other" value 24 is the game's language, from Game.dat's settings byte 17 (5 is English and
+  reads 2, as the manual lists English). Changing that byte in the PC game's own Game.dat switched its dungeon book
+  between its English and Japanese layouts, and no other value from 0 to 6 gave the English one.
+- Map position chip numbers (4 to 7) count autotiles from 1 and base tiles from 33, as the manual's "32 and up" says,
+  and passability there (2 and 3) is 1 where the way is blocked, as the dungeon's warning tile shows on the PC. Its
+  dungeon floors are pictures built from these.
+- A character's value 20 is its chip plus one for an event drawn as a map chip and -1 for an erased one, and any
+  character value of a character that doesn't exist reads -1. Its dungeons pick their objects by the chip and end a
+  loop over event IDs on the first missing one; the loop ran forever and the hero walked one step only.
+- The move command reads its character from a variable when it names one. Its dungeons move a barrier away once it
+  opens.
+- The choice window measures as on the PC: 10 and 11 pixels from its edge to the cursor, the text 6 pixels into the
+  cursor, rows the base size plus Game.dat's choice spacing (settings byte 12) apart.
+
 Its battle events read keys every other frame, so the Linux host's scripted presses there need to last two frames.
+`Engines/WolfRPG/host/tools/wolfdrive` keeps a game running and takes commands on its standard input (run, tap, hold,
+shot, save, load, pics, sys, state), which makes long play-throughs against the PC practical.
 
 ## Known limits
 
@@ -285,16 +322,16 @@ Its battle events read keys every other frame, so the Linux host's scripted pres
   centre. A value of -1 means the default, and any other value counts, so Succubus Prison's -1000 hides the choices
   behind its picture menu. Compared with the PC in False Myth 2 (3 and 4 set); Succubus Prison's `Game.exe` stops with a
   buffer overrun under Wine, and Parade Buster's crashes on its data. The window's padding (system variables 26 and 27
-  in Wolf RPG Editor 3) isn't read; False Myth 2's choice box comes out about 50 pixels wider than the PC's.
+  in Wolf RPG Editor 3) isn't read: False Myth 2 leaves them at 0, and its window measures as the PC's.
 - Picture commands with a start delay run at once, and the delay reset command does nothing. The standard systems
   repeat their slide-in moves with delays of 3 and 5 frames toward the same place, so the result looks the same.
-- Free-form pictures (the four-corner flag) draw as plain rectangles. Test Game 02's developer debug tool uses them,
-  and so does False Myth 2's battle hint beside the hero, a diamond on the PC and a square in VNDegen.
-- Not drawn: `<MAP_SCREENSHOT>` pictures, video pictures, and the text codes `\f+`, `\fR`, `\cS`, `\cR`, `\img`,
-  `\isize`, `\bx` and `\se`. False Myth 2's battle label "Hold: End Turn" leaves out the X button image its `\img`
-  names. `\A+` and `\A-` are read but text is always antialiased.
-- Picture effects of the effect command's second set (its 0x100 flag), such as the blur False Myth 2 lays over the
-  screenshot behind its tutorial panels, and effects on target kind 3 aren't run. They log once.
+- Free-form pictures draw without their angle, and a zoom correction scales them about their centre.
+- Not drawn: `<MAP_SCREENSHOT>` pictures, video pictures, and the text codes `\f+`, `\fR`, `\cS`, `\cR`, `\bx` and
+  `\se`. `\A+` and `\A-` are read but text is always antialiased.
+- Of the effect command's second set (its 0x100 flag) only the blur runs; the others, and effects on target kind 3,
+  log once. Its type 0x60 is drawn as a flicker; False Myth 2's uses, with three colour-like values, suggest the
+  manual's automatic flash instead, which hasn't been compared with the PC. The picture effects added here (blur,
+  corrections, second shift) aren't kept in saves, like the others.
 - Pictures numbered 100,000 and above draw below the message window, not above it. Only Test Game 02's debug tool
   uses such numbers.
 - Game.dat's picture behaviour setting (Ver1 or Ver2) isn't read: showing a picture that is already shown starts it
@@ -303,8 +340,16 @@ Its battle events read keys every other frame, so the Linux host's scripted pres
   picture again with its opacity kept, and up to 0.41.6 the face vanished and the map showed through her bust (#179).
 - System variable 115, the engine version the standard systems read, is set to 2.24 for Shift-JIS games and 3.28 for
   UTF-8 ones, since no Game.dat field is known to hold the real one.
-- False Myth 2: in the tutorial battle, which starts during a scene the player can skip, the scene's "Hold X key:
-  Skip" stays over the battle's "Hold: End Turn" label. Past the first dungeon's tutorial panels it hasn't been played
-  in VNDegen. The party command's other specials (warping the party to the hero, sync, remembering graphics, the
-  caterpillar switch) aren't run.
+- False Myth 2: past the South Tower after the first dungeon it hasn't been played in VNDegen, and no shop has been
+  reached. The party command's other specials (warping the party to the hero, sync, remembering graphics, the
+  caterpillar switch) aren't run. No point was reached where the party is transparent and the menu can save, so a save
+  with the hero hidden hasn't been compared with the PC.
+- Characters move a whole tile at a time and a tile blocks only when all four of its passability bits are set. Wolf RPG
+  Editor can move in half tiles, and the manual's specification page says a character can't move while it overlaps a
+  blocked quarter of a tile. False Myth 2 moves in half tiles: on the PC its hero stops half a tile into the South
+  Tower tile at 24,34 (passability 0x21), where VNDegen walks onto it. A save made there in VNDegen loads on the PC at
+  the same place, since the game stores the hero's position in spare variables 9 (3 to 5) and moves the hero there
+  after a load, and on the PC the hero then can't move at all. Saves made on tiles without blocked quarters walk on the
+  PC (the Sanctuary's). Found by swapping each part of the save with one that walks; the save format itself matches.
+- Game.dat's language byte is read only as English (5) or Japanese; the other languages' values aren't known.
 - Of the effect command's map effects only the zoom is drawn; the library uses no other.
