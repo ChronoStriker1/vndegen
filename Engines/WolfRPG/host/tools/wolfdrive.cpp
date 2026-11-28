@@ -4,11 +4,14 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../../../../Packages/VNDegenKit/Sources/CWolfRPG/third_party/stb/stb_image_write.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <string>
+#include <vector>
 
 using namespace wolf;
 
@@ -39,6 +42,7 @@ int main(int argc, char **argv) {
     KeyCodes heldCodes;
     int mouseX = 0, mouseY = 0;
     long frameNo = 0;
+    double slowMs = 0;
 
     auto step = [&](uint32_t pressed, const KeyCodes &codesPressed, uint32_t mousePressed = 0) {
         Input in;
@@ -51,8 +55,14 @@ int main(int argc, char **argv) {
         in.mousePressed = mousePressed;
         in.mouseHeld = mousePressed;
         in.touched = mousePressed != 0;
+        auto t0 = std::chrono::steady_clock::now();
         game.update(in);
+        auto t1 = std::chrono::steady_clock::now();
         renderer.draw(frame);
+        auto t2 = std::chrono::steady_clock::now();
+        double u = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        double d = std::chrono::duration<double, std::milli>(t2 - t1).count();
+        if (slowMs > 0 && u + d > slowMs) std::printf("slow frame %ld update %.1f ms draw %.1f ms\n", frameNo, u, d);
         frameNo++;
     };
     auto run = [&](int n) {
@@ -156,6 +166,35 @@ int main(int argc, char **argv) {
             if (game.textEntry().active) std::printf("text entry\n");
         } else if (cmd == "unsupported") {
             for (auto [code, n] : game.unsupported()) std::printf("unsupported command %d x%d\n", code, n);
+        } else if (cmd == "slow") {
+            ss >> slowMs;
+        } else if (cmd == "time") {
+            int n = 600;
+            ss >> n;
+            std::vector<double> updates, draws;
+            for (int i = 0; i < n; i++) {
+                Input in;
+                in.held = held;
+                in.keysHeld = heldCodes;
+                in.mouseX = mouseX;
+                in.mouseY = mouseY;
+                auto t0 = std::chrono::steady_clock::now();
+                game.update(in);
+                auto t1 = std::chrono::steady_clock::now();
+                renderer.draw(frame);
+                auto t2 = std::chrono::steady_clock::now();
+                frameNo++;
+                updates.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+                draws.push_back(std::chrono::duration<double, std::milli>(t2 - t1).count());
+            }
+            auto report = [](const char *name, std::vector<double> v) {
+                double sum = 0;
+                for (double x : v) sum += x;
+                std::sort(v.begin(), v.end());
+                std::printf("%s avg %.2f ms p99 %.2f max %.2f\n", name, sum / v.size(), v[v.size() * 99 / 100], v.back());
+            };
+            report("update", updates);
+            report("draw", draws);
         } else if (cmd == "quit") {
             break;
         } else {

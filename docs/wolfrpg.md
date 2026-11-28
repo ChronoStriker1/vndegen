@@ -94,6 +94,28 @@ version 159 keep them. `<CUT/Xa-b/Yc-d>` before a file name shows part of each p
 
 Map event pages hold their animation speed, move speed, move frequency and move type in that order. Characters draw from images of 3 or 5 patterns by 4 rows, or with eight-direction images (Game.dat's settings byte 1 is 8) two such blocks side by side, the diagonals in the second, as the manual's material page shows.
 
+### Half-tile movement
+
+Characters keep their position in half tiles, as saves and the variable command's precise coordinates count it. A game
+whose Game.dat settings byte 9 is 0 moves its characters half a tile a step, as Wolf RPG Editor's "default character
+move width" of 0.5; False Myth 2 is the library's one such game, and the others (byte 9 is 1) keep the whole-tile rules
+described below unchanged. Each character's step is also in its save record (`v78`: 1 for half, 2 for whole): with 2
+written into a False Myth 2 save, the PC's hero steps a whole tile, so a load takes it from there. Move route steps 48
+and 49 switch a character between the two in such a game.
+
+In a half-tile game, as the manual's specification page says, a character can't move while its box overlaps a blocked
+quarter of a tile, and can't move into one. A tile's passability bits 0 to 3 block its bottom-right, bottom-left,
+top-right and top-left quarters. The hero and party meet the tiles with the lower half of their tile when settings byte 8
+is 0 (False Myth 2), and touch events and other characters with their whole tile, as their save records' size (`v8c`,
+2 by 2) says; events use their lower half unless their page's square option (0x20) is on. Events placed half a tile up or
+left (page options 0x40 and 0x80) start there on entering the map. Touch ranges reach that many tiles both ways, as the
+manual's exit picture shows. Player touch needs the hero inside the range from side to side, event touch any overlap; a
+confirm press goes through the events in id order and starts the first one the hero stands in or, for one that blocks
+the way, faces. All of this was found by walking False Myth 2's hero under Wine into the Sanctuary's partly blocked
+tiles, its door and its dungeon sign and reading the position from a save: it stops at the same half tiles in VNDegen
+(`Engines/WolfRPG/host/halfstep_test.cpp`, with the game and its saves). Whole-tile games give the same states and
+frames as before over the same scripted play (Milky Quest, Drain Dungeon, Journey of Depravity).
+
 A message draws only its text, at the top left that system variables 1 and 2 give when it starts, as on the PC. The
 engine has no message window or face of its own: the manual's message page says a game's common events draw them, and
 the standard systems' message window event does, reading the face number that `@n` at the start of a message puts in
@@ -306,7 +328,7 @@ shot, save, load, pics, sys, state), which makes long play-throughs against the 
 - Input a player doesn't have on VNDegen: a game's own gamepad button queries (key input kind 2) read nothing, since VNDegen delivers controllers as keyboard keys, and system variable 38 isn't read, so no key or click reaches an event while the player types. Multiple touch and analog stick queries aren't used by a library game.
 - YUME-SAME turns off the keys a touch gamepad or controller presses, so it plays by touch or pointer only: touches outside the gamepad's buttons work as the mouse under every control method that lets them through. A right click needs the Touch mouse method's two-finger tap or a controller's pointer layout. Two Beasts and Parade Buster also take a controller's Cancel for it.
 - Hidden string codes run only for what library games use in play: `GET_FILE_EXIST`, `GET_STRING_WIDTH_COUNT`, `GET_STRING_BYTE_COUNT`, `GET_TITLE`, `GET_TITLE_PLUS` (empty), `GET_COMMONEVENT_ID_FROM_NAME`, `GET_MAPEVENT_NAME_FROM_ID`, `GET_MAPEV_FILENAME`, `GET_FILENAME_FROM_PICTURE`, `MAKE_EVENT`, `SET_EVENT_NAME_ID` and `FIND_PATH_DIR4`. Others log once and give empty text; in The Clumsy Witch Seris they are in its debug events. Events `MAKE_EVENT` adds aren't written into saves.
-- Writing an event's position through a variable address moves it at once, where the PC walks it. Command 240 (tile passability settings) isn't run: The Clumsy Witch Seris has two uses, neither in the parts played. Move route step 48 isn't run.
+- Writing an event's position through a variable address moves it at once, where the PC walks it. Command 240 (tile passability settings) isn't run: The Clumsy Witch Seris has two uses, neither in the parts played. Move route step 48 (half steps) isn't run in whole-tile games.
 - CSV and text files are written as UTF-8 with a byte order mark, as Wolf RPG Editor 3 games write them. The one Shift-JIS game that writes a CSV (YUME-SAME) does so only in a debug event.
 - The string command's typed text draws at system variables 40 and 41 at the base font size. No PC comparison: the one library game we typed in on Linux, MARAGON QUEST, doesn't start on the PC under Wine, because its map file names came out of its archive mangled.
 - Cancelling typed text leaves the variable as it was, and system variable 39 reads -1. Not compared with the PC.
@@ -344,12 +366,10 @@ shot, save, load, pics, sys, state), which makes long play-throughs against the 
   reached. The party command's other specials (warping the party to the hero, sync, remembering graphics, the
   caterpillar switch) aren't run. No point was reached where the party is transparent and the menu can save, so a save
   with the hero hidden hasn't been compared with the PC.
-- Characters move a whole tile at a time and a tile blocks only when all four of its passability bits are set. Wolf RPG
-  Editor can move in half tiles, and the manual's specification page says a character can't move while it overlaps a
-  blocked quarter of a tile. False Myth 2 moves in half tiles: on the PC its hero stops half a tile into the South
-  Tower tile at 24,34 (passability 0x21), where VNDegen walks onto it. A save made there in VNDegen loads on the PC at
-  the same place, since the game stores the hero's position in spare variables 9 (3 to 5) and moves the hero there
-  after a load, and on the PC the hero then can't move at all. Saves made on tiles without blocked quarters walk on the
-  PC (the Sanctuary's). Found by swapping each part of the save with one that walks; the save format itself matches.
+- Whole-tile games keep the old rules: a tile blocks only when all four of its passability bits are set, events placed
+  half a tile up or left stand on their tile, and touch ranges aren't read. The manual's half-tile overlap rules for
+  them (its specification page's 0.5-tile wider touch) haven't been compared with the PC. In half-tile games a whole
+  step from a half position, which the PC refuses (a False Myth 2 save edited to whole steps at 47,45 can turn but not
+  walk), isn't refused, and a character's box is checked only where its step ends.
 - Game.dat's language byte is read only as English (5) or Japanese; the other languages' values aren't known.
 - Of the effect command's map effects only the zoom is drawn; the library uses no other.

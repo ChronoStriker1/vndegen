@@ -21,6 +21,11 @@ inline void blendPixel(uint8_t *d, int r, int g, int b, int a, Blend blend) {
                 d[1] = clamp8(g);
                 d[2] = clamp8(b);
                 d[3] = 255;
+            } else if (d[3] == 255) {
+                int inv = 255 - a;
+                d[0] = clamp8((r * a + d[0] * inv) / 255);
+                d[1] = clamp8((g * a + d[1] * inv) / 255);
+                d[2] = clamp8((b * a + d[2] * inv) / 255);
             } else {
                 int inv = 255 - a;
                 int da = d[3];
