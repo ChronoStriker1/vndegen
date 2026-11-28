@@ -176,6 +176,11 @@ bool sgi_exec(SG *g, const Cmd *c, bool *busy) {
         g->e.save.config[1] = cmd_int(c, 0) == 0;
         sg_log(g, "encounters %s", cmd_int(c, 0) == 0 ? "on" : "off");
         return true;
+    case 68:
+    case 77:
+        *(c->type == 68 ? &g->interp.a.menuOff68 : &g->interp.a.menuOff77) = cmd_int(c, 0) != 0;
+        sg_log(g, "command %d: menu %s", c->type, cmd_int(c, 0) != 0 ? "off" : "on");
+        return true;
     case 70: random_variable(g, c); return true;
     case 56: learn_skill(g, c); return true;
     case 55: give_exp(g, c); return true;
