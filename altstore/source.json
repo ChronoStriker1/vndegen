@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.61.14",
+          "buildVersion": "3909",
+          "date": "2026-11-28T11:26:31Z",
+          "localizedDescription": "False Myth 2 plays on past the South Tower.\n\n## Downloads\n\n- `VNDegen-0.61.14-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.61.14.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.61.14-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **Wolf RPG Editor:** loading a save resets the hero's walk-through, fixed facing and height. False Myth 2 lets its hero walk through things in its dungeons and scenes, and after loading a save made elsewhere the hero walked straight past the dungeon sign and other events.\n\n## Known limits\n\n- **False Myth 2:** the story after the \"Unwanted Deathmatch\" battle at the South Tower hasn't been played in VNDegen, and no shop has been reached.\n- **False Myth 2:** on a Mac busy with other work, dungeons and battles still hitch for a moment every few seconds. The app is mostly waiting then, not drawing (#206).\n\n## What wasn't tested\n\n- Real iPhones and iPads, and a Mac with nothing else running.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.61.14/VNDegen-0.61.14.ipa",
+          "size": 133269705,
+          "sha256": "9a6f1a8c83a7c977d32d67542526f0a93f8e32aa14b3688fa607b763506e0c2d",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.61.13",
           "buildVersion": "3903",
           "date": "2026-11-28T09:12:38Z",
