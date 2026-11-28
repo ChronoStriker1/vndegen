@@ -1110,8 +1110,8 @@ static void input(Battle *b) {
         }
         break;
     case PH_ALLY:
-        if (sg_pressed(g, KEY_UP) || sg_pressed(g, KEY_LEFT)) b->targetCursor = (b->targetCursor + b->partyCount - 1) % b->partyCount;
-        if (sg_pressed(g, KEY_DOWN) || sg_pressed(g, KEY_RIGHT)) b->targetCursor = (b->targetCursor + 1) % b->partyCount;
+        if (sg_pressed(g, KEY_LEFT)) b->targetCursor = (b->targetCursor + b->partyCount - 1) % b->partyCount;
+        if (sg_pressed(g, KEY_RIGHT)) b->targetCursor = (b->targetCursor + 1) % b->partyCount;
         if (sg_pressed(g, KEY_OK)) {
             b->plan[b->member].target = b->targetCursor;
             commit_member(b);
