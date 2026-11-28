@@ -509,6 +509,12 @@ std::string Game::expandText(const std::string &text, const Thread *t) const {
             int n = number(i + 2);
             if (n >= 0 && n < int(normal_.size())) out += std::to_string(normal_[n]);
             i = close;
+        } else if (i + 3 < text.size() && text[i + 1] == 'v' && text[i + 2] >= '1' && text[i + 2] <= '9' && text[i + 3] == '[') {
+            int n = number(i + 3);
+            Thread copy = t ? *t : Thread{};
+            if (n >= 0 && n < 100000)
+                out += std::to_string(const_cast<Game *>(this)->readVar(2100000 + (text[i + 2] - '1') * 100000 + n, copy));
+            i = close;
         } else if (code("s")) {
             int n = number(i + 2);
             if (n >= 0 && n < int(strings_.size())) out += strings_[n];

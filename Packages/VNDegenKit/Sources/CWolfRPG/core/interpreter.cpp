@@ -1139,7 +1139,32 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
             for (auto [to, from] : {std::pair{&fresh.opacity, &p.opacity}, {&fresh.zoomX, &p.zoomX}, {&fresh.zoomY, &p.zoomY},
                                     {&fresh.angle, &p.angle}, {&fresh.r, &p.r}, {&fresh.g, &p.g}, {&fresh.b, &p.b}})
                 to->set(from->to, 0);
-        } else {
+        }
+        if (existing != pictures_.end()) {
+            fresh.autoPatternMode = p.autoPatternMode;
+            fresh.autoFrom = p.autoFrom;
+            fresh.autoTo = p.autoTo;
+            fresh.autoInterval = p.autoInterval;
+            fresh.autoTimer = p.autoTimer;
+            fresh.autoDir = p.autoDir;
+            fresh.shakePower = p.shakePower;
+            fresh.shakeSpeed = p.shakeSpeed;
+            fresh.shakeFrames = p.shakeFrames;
+            fresh.shakeOffset = p.shakeOffset;
+            fresh.shiftX = p.shiftX;
+            fresh.shiftY = p.shiftY;
+            fresh.effectZoom = p.effectZoom;
+            fresh.effectZoomX = p.effectZoomX;
+            fresh.effectZoomY = p.effectZoomY;
+            fresh.pulse = p.pulse;
+            fresh.pulseInterval = p.pulseInterval;
+            fresh.flickerFrames = p.flickerFrames;
+            fresh.flickerInterval = p.flickerInterval;
+            fresh.flash = p.flash;
+            fresh.flashFrames = p.flashFrames;
+            fresh.flashLeft = p.flashLeft;
+        }
+        if (!shown) {
             fresh.opacity.set(0, 0);
             fresh.zoomX.set(100, 0);
             fresh.zoomY.set(100, 0);
