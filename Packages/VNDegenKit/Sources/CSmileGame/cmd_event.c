@@ -372,8 +372,7 @@ bool sga_field_input(SG *g) {
             if (g->interp.active) return true;
         }
     }
-    u32 want = dir == 0 ? KEY_UP : dir == 1 ? KEY_RIGHT : dir == 2 ? KEY_DOWN : KEY_LEFT;
-    if (g->keys & want) {
+    if (sg_key_dir(g) == dir) {
         int i = npc_at(g, tx, tz, false);
         if (i >= 0 && (trigger_of(g, i) == TRIG_EVENT_TOUCH || (trigger_of(g, i) == TRIG_TOUCH && g->field.npcs[i].visible))) {
             sga_start_event(g, i, a->ev[i].sheet);
