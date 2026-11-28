@@ -973,6 +973,11 @@ void Game::effectCommand(Thread &t, const Command &c) {
             auto it = pictures_.find(n);
             if (it == pictures_.end()) continue;
             Picture &p = it->second;
+            if (flags & 0x100) {
+                if (type == 0x70) p.blur = std::clamp(a1, 0, 16);
+                else unsupported(c);
+                continue;
+            }
             switch (type) {
                 case 0x00:
                     p.flash = {a1, a2, a3};

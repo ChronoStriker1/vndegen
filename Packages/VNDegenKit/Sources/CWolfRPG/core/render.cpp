@@ -147,6 +147,36 @@ void Renderer::drawWindow(Canvas &canvas, const Bitmap &skin, RectF d, float opa
 
 namespace {
 constexpr std::string_view kScreenshot = "<SCREENSHOT>";
+
+void boxBlur(Bitmap &b, int radius) {
+    if (b.empty() || radius <= 0) return;
+    std::vector<uint32_t> sum;
+    std::vector<uint8_t> line;
+    auto pass = [&](int count, int length, auto at) {
+        line.resize(size_t(length) * 4);
+        sum.assign(4, 0);
+        for (int i = 0; i < count; i++) {
+            for (int k = 0; k < length; k++) std::memcpy(&line[size_t(k) * 4], at(i, k), 4);
+            uint32_t acc[4] = {0, 0, 0, 0};
+            int window = radius * 2 + 1;
+            for (int k = -radius; k <= radius; k++) {
+                const uint8_t *px = &line[size_t(std::clamp(k, 0, length - 1)) * 4];
+                for (int ch = 0; ch < 4; ch++) acc[ch] += px[ch];
+            }
+            for (int k = 0; k < length; k++) {
+                uint8_t *out = at(i, k);
+                for (int ch = 0; ch < 4; ch++) out[ch] = uint8_t(acc[ch] / window);
+                const uint8_t *add = &line[size_t(std::min(k + radius + 1, length - 1)) * 4];
+                const uint8_t *drop = &line[size_t(std::max(k - radius, 0)) * 4];
+                for (int ch = 0; ch < 4; ch++) acc[ch] += add[ch] - drop[ch];
+            }
+        }
+    };
+    for (int round = 0; round < 3; round++) {
+        pass(b.h, b.w, [&](int y, int x) { return b.row(y) + size_t(x) * 4; });
+        pass(b.w, b.h, [&](int x, int y) { return b.row(y) + size_t(x) * 4; });
+    }
+}
 }
 
 const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offsetX, float &offsetY) {
@@ -155,16 +185,20 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
     bool fromArrays = p.kind == PictureKind::File;
     bool screenshot = fromArrays && p.source == kScreenshot;
     // An image made from arrays is made when shown, so it follows the generation rather than the name.
+    bool xy = fromArrays && p.source.starts_with("<XY");
     if (cached.kind != p.kind || cached.source != p.source || cached.w != w || cached.h != h ||
-        (fromArrays && cached.generation != p.generation)) {
+        cached.blur != p.blur || (fromArrays && cached.generation != p.generation)) {
         cached.kind = p.kind;
         cached.source = p.source;
         cached.w = w;
         cached.h = h;
+        cached.blur = p.blur;
         cached.generation = p.generation;
         cached.offsetX = cached.offsetY = 0;
         if (screenshot) {
             cached.bitmap = screen_;
+        } else if (fromArrays && !xy) {
+            cached.bitmap = *images_.get(p.source);
         } else if (fromArrays) {
             static const XYImage empty;
             const XYImage &xy = p.xyImage ? *p.xyImage : empty;
@@ -194,6 +228,7 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
                 drawWindow(c, *images_.get(p.source), {0, 0, float(w), float(h)}, 1);
             }
         }
+        if (fromArrays && p.blur > 0) boxBlur(cached.bitmap, (p.blur + 1) / 2);
     }
     offsetX = cached.offsetX;
     offsetY = cached.offsetY;
@@ -205,7 +240,7 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     const Bitmap *img = nullptr;
     BitmapPtr file;
     float offsetX = 0, offsetY = 0;
-    if (p.kind == PictureKind::File && !p.source.starts_with("<XY") && p.source != kScreenshot) {
+    if (p.kind == PictureKind::File && !p.source.starts_with("<XY") && p.source != kScreenshot && p.blur == 0) {
         file = images_.get(p.source);
         img = file.get();
     } else {

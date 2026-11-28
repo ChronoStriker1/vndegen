@@ -1163,6 +1163,7 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
             fresh.flash = p.flash;
             fresh.flashFrames = p.flashFrames;
             fresh.flashLeft = p.flashLeft;
+            fresh.blur = p.blur;
         }
         if (!shown) {
             fresh.opacity.set(0, 0);

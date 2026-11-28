@@ -113,6 +113,7 @@ struct Picture {
     int flickerFrames = 0, flickerInterval = 0;
     std::array<int, 3> flash{0, 0, 0};
     int flashFrames = 0, flashLeft = 0;
+    int blur = 0;
     bool erasing = false;
 };
 
