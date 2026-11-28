@@ -134,6 +134,13 @@ void field_free(Field *f) {
     f->player = player;
 }
 
+int sg_key_dir(SG *g) {
+    int dir = g->keys & KEY_UP ? 0 : g->keys & KEY_DOWN ? 2 : g->keys & KEY_LEFT ? 3 : g->keys & KEY_RIGHT ? 1 : -1;
+    const View *v = g->r3.view;
+    if (dir < 0 || !v || v->eye) return dir;
+    return (dir - (int)lroundf(v->pose.yaw / 90.0f) % 4 + 8) % 4;
+}
+
 static bool walkable(SG *g, Field *f, int fromX, int fromZ, int x, int z) {
     (void)f;
     return sgi_cell_free(g, fromX, fromZ, x, z, -1);
@@ -146,12 +153,10 @@ void field_update(SG *g, u32 ms) {
     p->animMs += ms;
     if (!g->interp.active) {
         if (!p->moving) {
-            int dx = 0, dz = 0, dir = p->dir;
-            if (g->keys & KEY_UP) dz = -1, dir = 0;
-            else if (g->keys & KEY_DOWN) dz = 1, dir = 2;
-            else if (g->keys & KEY_LEFT) dx = -1, dir = 3;
-            else if (g->keys & KEY_RIGHT) dx = 1, dir = 1;
-            if (dx || dz) {
+            static const int kDx[4] = {0, 1, 0, -1}, kDz[4] = {-1, 0, 1, 0};
+            int dir = sg_key_dir(g);
+            if (dir >= 0) {
+                int dx = kDx[dir], dz = kDz[dir];
                 p->dir = dir;
                 int cx = (int)p->x, cz = (int)p->z;
                 if (walkable(g, f, cx, cz, cx + dx, cz + dz)) {

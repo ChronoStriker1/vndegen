@@ -131,6 +131,14 @@ static void split_pages(SG *g, Interp *ip, const char *text) {
         }
         while (*p == '\n') p++;
     }
+    size_t len = strlen(wrapped);
+    if (len >= 2 && wrapped[len - 1] == '\n' && wrapped[len - 2] != '\n') {
+        const char *seg = wrapped;
+        for (const char *b = strstr(wrapped, "\n\n"); b && b < wrapped + len - 1; b = strstr(b + 1, "\n\n")) seg = b + 2;
+        int lines = 0;
+        for (const char *c = seg; *c; c++) lines += *c == '\n';
+        if (lines > 0 && lines % kPageLines == 0) push_page(ip, "", 0);
+    }
     if (!ip->pageCount) push_page(ip, "", 0);
     free(wrapped);
 }

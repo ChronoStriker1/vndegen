@@ -456,13 +456,6 @@ static void shop_list(SG *g, Menu *m, List *l) {
 
 static void skill_list(SG *g, const Member *mb, List *l) {
     l->count = 0;
-    const HeroDef *h = hero_def(T(g), mb->hero);
-    if (!h) return;
-    for (int i = 0; i < h->skillCount && l->count < 256; i++) {
-        if (h->skills[i].level > mb->level) continue;
-        l->ids[l->count] = h->skills[i].skill;
-        l->counts[l->count++] = 0;
-    }
     for (int i = 0; i < mb->learnedCount && l->count < 256; i++) {
         bool dup = false;
         for (int k = 0; k < l->count && !dup; k++) dup = guid_eq(l->ids[k], mb->learned[i]);
@@ -1616,7 +1609,7 @@ bool menu_frame(SG *g, u32 ms) {
     Menu *m = menu_get(g);
     if (!m) return false;
     if (m->mode == MENU_CLOSED) {
-        if (!g->interp.active && !g->pendingTransfer && g->fadeLevel <= 0 && sg_pressed(g, KEY_CANCEL)) {
+        if (!g->interp.active && !g->pendingTransfer && g->fadeLevel <= 0 && !g->interp.a.menuOff68 && !g->interp.a.menuOff77 && sg_pressed(g, KEY_CANCEL)) {
             sgb_sound(g, SND_DECIDE);
             menu_open(g);
         } else {

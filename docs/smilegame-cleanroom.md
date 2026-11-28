@@ -794,7 +794,7 @@ and back, beside the SDL runner playing the same path with real key events.
   204 bytes at level 2 with キュアー (his level 2 skill) in it, and round 3's patched save, levelled to 6 by command
   55 after command 56 taught ファイア and アイス, held those two and then his level 2, 5 and 6 skills: ファイア, his level
   3 skill, was not added twice. Level 1 skills are not in it. The runtime appends the
-  skills of each level passed at a level-up and lists the learned skills in battle after the hero table's.
+  skills of each level passed at a level-up; battle and menu skill lists show the learned list alone (round 6, T).
 - The monster table's two `int32` before the drops are the money and then the experience (ゾンビーナＬＶ01's result:
   経験値 32 and 13 G, the table holds 13 then 32).
 
@@ -1154,8 +1154,8 @@ Seen on the PC player under Wine from N's volcano save and the runner's saves af
   the back arrow, column 1 of `icon_system.png`'s first row: the game settings' second icon reference after the battle
   state messages (the third is 逃げる's runner at column 6, the first the NEW mark at column 0). Choosing 戻る goes
   back to the previous hero, as cancel does.
-- Choosing an ally for a skill moves with left and right on the PC; up and down do nothing there. The runtime takes
-  all four.
+- Choosing an ally for a skill moves with left and right on the PC; up and down do nothing there. The runtime does the
+  same since round 6.
 - ヒール in battle took ファフニール from 47 to 164 of 235: half her maximum, as in the field. 薬草 (30 %) in the
   field menu took アリア from 130 to 188 of 195: 30 % of the maximum, rounded down.
 
@@ -1177,3 +1177,151 @@ backing out on slot 6.
   seconds. The PC's ending showed `プレイ時間` and `7時間14分19秒` on one page for
   `プレイ時間/\Variable[15]時間\Variable[16]分\Variable[17]秒`, then THANK YOU FOR PLAYING on the next.
 - `\Variable[n]` in a message is variable n's value.
+
+## Sacred's post-game and CG room (round 6, S)
+
+Played in the runner from round 5 R's saves after the ending and compared with the PC player under Wine by loading the
+runner's saves there and playing the same steps.
+
+### Past the map's edge
+
+- Under the noon sky with the sun on (background 0), Sacred's player also draws nothing past the map's edge: below the
+  power spot's south cliff the PC shows the white behind, and below the last dungeon's entrance a dark grey. The
+  runtime now leaves the border out on such maps for both player versions; maps with the sun off keep it. Round 5's
+  purple sea past the cursed places was the map's own water: the blue past the edge was the runtime's border.
+- On a dark map the PC darkens that empty background with the map's light (about 8 % grey below the last dungeon,
+  whose light colours are key 15, 13, 3 and fill 65, 70, 75); the runtime shows the noon sky's white there.
+
+### Keys and the camera
+
+The PC turns the arrow keys with the camera. In the guards' lounge (the CG room, map camera yaw 57) and in
+サンプール (63), Up walks west, Right north, Down east and Left south: the PC's saves after one key each, and the
+runner's taps, from the same cells. The runtime rounds the view's yaw to a quarter turn and turns the key by it, for
+walking and for walking into a touch event. Sacred's maps turned that far are the bridge (85), サンプール, the pier
+(286), the second prison cell (269) and the lounge; the lounge's CG viewer sets yaw 0 with command 53 and leaves it
+there.
+
+### Touch events
+
+- A touch event (trigger 3) whose sheet is solid blocks the player and starts when walked into, whether or not it has
+  a graphic: the CG viewer's three hidden events beside the player switch pictures and play scenes while the player
+  stays on the viewer's cell.
+- One that isn't solid is walked onto and starts underfoot, graphic or not: the viewer's glow panel at (18,8) starts
+  as the player steps onto it from (18,9); its script moves the player up to (18,7). Leaving the viewer (Down) walks
+  onto the panel again, whose second sheet moves the player down a cell, to (18,9) in the PC's save.
+
+### Commands 68 and 77
+
+The CG viewer runs `77 1 1` and `68 1` as it starts and `77 0 0` and `68 0` as it ends. In between the PC's menu
+doesn't open; the runtime keeps it shut while either is on. Nothing in these games tells the two apart.
+
+### Scripted moves
+
+The fifth value of commands 11 and 17 decides whether the move passes through characters. With 0 the PC stops at a
+solid character: the post-game's opening walks the player seven cells down toward the dragon in the town, and the PC's
+save after the scene has the player at (19,15), the cell before it. With 1 it goes through (the boat ride's fifteen
+cells across the sea). Terrain wasn't seen stopping a scripted move, so the runtime stops one only at characters.
+
+### The post-game
+
+- The ending turns switch 38 on. Back in the town the dragon (？？？) attacks at once: command 65 with the continue
+  flag, so the story goes on after a loss; won, it gave 2500 experience and 2000 G on the PC and in the runner alike
+  (アリア 91,036, ロイ 111,240, 108,989 G). Switch 39 follows. The queen then sends the party to マオー and mentions the
+  CG room in the town.
+- The gates need マオー in the party, so the way to the demon continent is the ship from サンプール (a ticket from its
+  shop) to the pier, then the dragon tower's labyrinth door, which after the ending offers to skip the labyrinth.
+- On 魔王城B1F マオー hands over her house key (switch 40). The door on B3F opens on the 初代魔王's scene and four
+  強いスライミー (600 HP each, no continue flag); after them she makes the 魔力の塊 (switch 41).
+- The dragon girl sits at a campfire on the field at (72,24), north of the checkpoint below マウンティ. Her fight,
+  竜王（予定） (2400 HP, attack 350, speed 160, no continue flag), then her scene, sets switch 42.
+- Back in the town with the 魔力の塊, アリア's reminder plays (an autorun on the item), and the castle's last scene
+  follows on entering: リリアーヌ's fight with all four heroes on the unused throne-room map, then her scene. The 魔力の塊
+  is taken, switch 43 turns on, and the fairy's closing lines say the game is over.
+
+### Power spots
+
+The three power spots' events have an empty sheet once switch 38 is on, so after the ending nothing happens there on
+the PC or in the runtime (the first one checked on both, from the same save). Before the ending (round 5 R's save
+after the queen, through the gate to サンプール) the first one asks whether to strengthen ロイ's magic; yes starts a
+fight with six デビオ and デビコ, and after it command 56 teaches ロイ キュアリー and ファイアーボール. The PC's save after
+it holds the same three learned skills, experience (81,239) and cell as the runner's, and loads in the runner. The
+third, reached through the gate to マオー城, sets a 暗黒騎士 of 1500 HP on the party and then teaches レイズ and
+サンダーストーム; it was won in the runner, and the PC's fight from the same save wasn't finished. The second (three
+snow monsters) runs the same script and wasn't played.
+
+### Battles
+
+- The dragon girl's 竜王（予定） (attack 350) hit ロイ, defence 265 on both status pages, for 72 and 73 on the PC, where
+  the attack formula gives 61 to 68, and landed `会心の一撃` hits of about 151 several times in a fight. From the same
+  full-HP save with attacks only the PC's party lost and the runner's won; the runner wins it with healing. The queen's
+  fight, from round 5 R's save before her, was lost on both with attacks only and led to the same defeat scene.
+- ロイ's status page shows speed 164 in the runtime and 144 on the PC with 風のブーツ (an accessory whose speed field
+  is 20) worn: the PC's page doesn't add that field.
+- The PC's command list for ファフニール starts with スキル: she has no plain attack.
+
+### Saves
+
+The runner's saves in the town after the dragon, beside the first power spot after the ending, in サンプール, on
+the demon castle's B3F, at the campfire and in the town with the 魔力の塊 loaded in the PC at the same cell with the
+same party, levels, money and switches, and the scenes and fights after them played the same where the inputs were the
+same. R's PC save after the ending and the PC's save after the first power spot load in the runner.
+
+## Colette's post-game (round 6, T)
+
+### The North Tower's laps
+
+- Variable 10 counts the laps from 0. 15F's exit (26,22) raises it and sends the party to 1F (26,8); on the fifth lap
+  (10 = 4) it shows `強い妖気を感じる・・・` and sends them to ドラコ's map (8,33) instead. The floor captions read
+  `幽玄の塔 N週目 NNF`, and from 10 = 5 `幽玄の塔MAX`.
+- Each floor's escape gate is two events on one cell with no sheet conditions: an older one that sets variable 10 to
+  0 and sends the party to the world map's 31,41, and a later, invisible one that keeps the lap and sends them to 40,11
+  beside the tower. Escaping from lap 3's 1F on the PC kept variable 10 at 2 and put the party at 40,11, as the
+  tower's adventurer promises (`途中で戻っても、周回はリセットされない`). On a cell with several touch events the PC runs
+  the last one. The runtime starts it on walking into the cell when the cell also holds a solid touch event (the
+  gate's model).
+- On 15F the first lap's ゾンビ is a スライム on the second, whose defeat runs its scene (スライムＨ) and returns to
+  15F; the third lap has none (`今回は敵がいないようだ`) and a chest with エリクサー. These two were played in the
+  runner only. On the fourth lap the statue (19,22) sets variable 1
+  to 17 and switch 24 and shows the caption `新たな調教が思い浮かんだ！『騎乗位中出し』`. The PC showed the same two
+  messages and caption from the same save.
+
+### The castle basement
+
+The throne room's door (10,4) leads to the log room (ログ) and its passage at 0,16 to the basement (地下牢), where
+Colette's event (trigger 5) offers 話す, 陵辱する（騎乗位） and 城に戻る while variable 1 is 17. The scene ends with
+variable 1 at 18 and the choice 話す, 陵辱する, 城に戻る. From the same save the PC played the same messages, and after
+城に戻る its save in the throne room matched the runner's in every variable, switch, hero and item.
+
+- `さっさと脱いで、俺の上にまたがれよ。` has three lines and a final line break. The PC shows the fourth, empty line
+  as a page of its own and waits on an empty window; the runtime now does the same when a message ends with one line
+  break right after a full page.
+- After a message the PC keeps the empty message window under the next choice; the runtime doesn't.
+
+### ドラコ
+
+Her map's event at 16,27 starts two battles in a row: ドラコ (1100 HP) and 裸のドラコ (1800 HP), then her scene, a
+return to the world map's 40,12 and the developers' message (`Congratulations！！`, `おめでとうございます。`). The PC's
+first turn from the same save: コレットファイナルスラッシュ took 292 (the runtime's took 274 to 276), and 毒の泉 took 3
+from each hero and poisoned them. With plain attacks the party at levels 20 and 21 beat ドラコ and lost to 裸のドラコ
+on the PC and in the runtime; the runtime won both with skills.
+
+### Skill lists
+
+A hero's battle skill list and the menu's skill page hold the learned list alone, in its order. メイリ's saved list
+holds six skills (キュアラル, エリアヒール, ファイアストーム, レイズ, ハイエリアヒール, メテオボム) and the PC shows those
+six; her table's level 1 ヒーリング and ファイア are not offered. サキュバス's page has no アイス (her level 1 skill).
+
+### Battles
+
+- マンドラゴラＬＶ03's パニックボイスLV02 (power 0, all heroes, confusion, hit 78) took 6 HP from each hero on the PC;
+  the runtime gives a power-0 skill 1. Confusion landed on ダーク and `ダークは混乱から回復した！` showed after all the
+  turn's actions; the runtime ends confusion when the fighter's own turn comes.
+- A fallen hero lies in its `keepdown` motion (メイリ's `w_majyo001_keepdown.png`), after its `KO` motion when it has
+  one, dark and see-through: on 裸のドラコ's black backdrop the PC drew メイリ's at a quarter of the image's colours, and
+  on the tower floor the floor showed through her. The runtime draws it at half brightness and half opacity.
+
+### Saves
+
+Runner saves loaded in the PC at the same cell and state: lap 2's 4F, lap 3's 1F and 5F, lap 4's 15F beside the
+statue, the basement, ドラコ's map and the world map after her. PC saves loaded in the runner: the world map beside the
+tower after the lap 3 escape and the throne room after the basement scene.

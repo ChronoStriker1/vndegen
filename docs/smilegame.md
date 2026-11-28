@@ -20,8 +20,10 @@ walls of ice, fire and lightning, the North Tower (幽玄の塔) to its hall, th
 last scene in the throne room and the staff roll, with the scenes between them and their replays in the log room. The
 optional places were played too: ヤーマ岬 to its minotaur, the golem cave past its walls of fire and lightning to its
 boss and the moon flowers, and the クサレィ catacombs, opened with the key their old keeper sells, to their last floor.
-After the staff roll the post-game opens the North Tower's upper floors. It was all played that far in VNDegen,
-beside the PC. The game is in Japanese, as on the PC.
+After the staff roll the post-game was played to its end: the North Tower's five laps, each changing its floors, the
+second lap's slime, the fourth lap's statue that opens a new scene in the castle basement, and on the fifth lap ドラコ,
+her two battles and her scene, then the developers' closing message. It was all played in VNDegen, beside the PC.
+The game is in Japanese, as on the PC.
 
 - **Saves** are the PC version's own files in the game's `savedata` folder, so a save moves both ways between VNDegen
   and the PC copy, and Ludusavi backs them up as it does on Windows. Save from the game's menu (Escape, X, or Y and
@@ -30,7 +32,7 @@ beside the PC. The game is in Japanese, as on the PC.
 - **Controls** start on the RPG Maker layout: A confirms, B cancels, Y and Menu open the game's menu, X dashes. On a
   touch screen, a tap outside the touch gamepad confirms, as a click does on the PC, and holding a finger on the map
   opens the menu.
-- **What isn't there yet:** see the post-game note under Known limits. Battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
+- **What isn't there yet:** battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping, the odds of a state) are close estimates of
   the PC's. Known limits below lists the rest.
 
 ## Sacred
@@ -41,16 +43,20 @@ and the voyage, the sand temple, the ambush on the bridge and the prison where �
 snow town マウンティ, the dragon tower where ファフニール joins and its boss パンドラゴン, the labyrinth, シュワントー's
 tournament, the demon castle and マオー's scene there, the デオズズ volcano and its six 炎の悪魔, the gates back to
 ルディアノ, the town and castle dungeons and the queen, the cursed land, the last dungeon, the last battle and the
-ending. It was played that far in VNDegen, by play. The volcano's six 炎の悪魔, the last battle and the ending were
-played beside the PC under Wine from the same saves, and the last dungeon checked by saves both ways; the queen's
-fight was played in VNDegen only. The game is in Japanese, as on the PC.
+ending, and the post-game after it: the dragon in the town, the ship to the demon continent, マオー's key, the 初代魔王
+and her slimes, the dragon girl at her campfire, リリアーヌ's fight in the castle and the last scene. The CG room in
+the town shows its pictures and replays its scenes, and the power spots teach ロイ his spells before the ending.
+It was played that far in VNDegen, by play. The volcano's six
+炎の悪魔, the queen's fight, the last battle, the ending and the post-game's scenes and fights were played beside the PC
+under Wine from the same saves. The game is in Japanese, as on the PC.
 
 - **Saves** work as for Colette: the PC's own `savedata` files, both ways. Saves at the royal cave, サンプール, the
-  prison, the volcano depths, after the six 炎の悪魔, in the last dungeon and after the ending load in the PC with the
-  same place, party, items, money and levels, and the PC's saves from there load in VNDegen.
+  prison, the volcano depths, after the six 炎の悪魔, in the last dungeon, after the ending and through the post-game
+  (the town, サンプール, the demon castle, the campfire) load in the PC with the same place, party, items, money and
+  levels, and the PC's saves from there load in VNDegen.
 - **Controls** are the same as Colette's.
-- **What isn't there yet:** the optional places (the power spots' fights, the CG and debug rooms) and the post-game in
-  the castle after the ending haven't been played in VNDegen. Known limits below lists the rest.
+- **What isn't there yet:** the debug room, which the game doesn't let players reach. Known limits below lists the
+  rest.
 
 ## Test games
 
@@ -254,6 +260,18 @@ With the touch gamepad shown, the iPad simulator ran the cape and a slime battle
 runtime at 3.5 to 4.0 ms, the gamepad compositing cost described below. The iPad check loaded the optional places'
 saves from a copy of the game with every name's case swapped on a case-sensitive volume (`scripts/case-check.sh`).
 
+Colette's post-game, DEBUG builds of this round's branch on the Mac mini, 2026-11-27, from runner saves, no other build
+running (load 5 to 14). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden |
+|---|---|---|
+| North Tower 15F, fourth lap | 59.1 to 59.8, 23.2 to 42.8, 2.8 to 4.7 ms | 59.2 to 59.6, 23.6 to 33.3, 2.4 to 2.8 ms |
+| Castle basement scene | 59.7 to 59.9, 36.7 to 48.2, 3.6 to 4.2 ms | 57.3 to 59.4, 11.8 to 28.5, 3.1 to 3.3 ms |
+| ドラコ's battles | 59.0 to 59.7, 19.0 to 37.5, 4.9 to 7.4 ms | 57.8 to 59.4, 13.7 to 26.5, 5.1 to 5.8 ms |
+
+With the touch gamepad shown, the iPad simulator ran the tower floor at 43 to 45 frames a second with the runtime at
+2.3 to 2.6 ms, the gamepad compositing cost described below.
+
 Colette's first release, DEBUG builds of 208c06cf on the Mac mini, 2026-11-27, measured the same way (Mac app with no
 other app or build running, load average 3 to 5; one simulator booted at a time). The world map is the cell below
 the castle where the first monster reaches the player, the battle the command list of that battle. Target 60.
@@ -312,20 +330,31 @@ were taken with the gamepad shown.
   ヒール healing half of ロイ's maximum HP.
 - `sgtest_R`: Sacred to its ending: the save page's first slot after a load and its kept cursor, 戻る for the second
   hero in battle, and the ending's experience (command 55), play time (command 70) and `\Variable[n]` text.
+- `sgtest_S`: Sacred's post-game against the PC: arrow keys turned with the CG room's camera, the CG viewer keeping
+  the player on its cell with the menu shut, leaving it, the town scene's walk stopping before the dragon, and no
+  outside border under the power spot's noon sky.
 - `sgtest_M`: Colette's second half against the PC: a talk pressed mid-step, the fishing spot and its first catch, an
   opened chest, the fourth hero's place in battle, the experience curve, the noon sky's edge and the staff roll's
   sprites.
 - `sgtest_O`: Colette's optional places against the PC: the edge faces under the noon sky, water that stops the player,
   the golem cave's flame, an event's own switch after it moves the player, the first two heroes standing in front in
   battle, the poison bubbles coming and going, the bookshelf's vertex colours and no round shadow under the warp gates.
+- `sgtest_T`: Colette's post-game against the PC: the North Tower's escape gate keeping the lap, the blank page after
+  a full message in the castle basement, and battle skills taken from the learned list alone.
 - `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
   switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
   fades per player version and Colette's opening music.
 
 ## Known limits
 
-- Colette's post-game: VNDegen played the North Tower's floors 6 to 15 on the first of the five laps that lead to
-  ドラコ. The later laps, ドラコ and the prison scene weren't reached in VNDegen and may show problems.
+- Colette's post-game is hard at the levels the story leaves the party (16 to 21 here): VNDegen and the PC both lost
+  裸のドラコ's battle with plain attacks, and VNDegen won it with skills. Leaving the tower by a gate and resting keeps
+  the lap, as the tower's adventurer says.
+- The odds that a state lands are inferred: マンドラゴラ's パニックボイスLV02 confuses most of the party at once in
+  VNDegen. On the PC it took 6 HP from each hero where VNDegen takes 1, and the PC showed ダーク's recovery from
+  confusion after every action of the turn, where VNDegen recovers a fighter when its own turn comes.
+- After a message, the PC keeps an empty message window under the choice that follows; VNDegen shows the choice
+  alone.
 - In battles with three or four heroes the PC draws the first two a little larger than the camera alone would; the
   runtime stands them a cell forward, which puts their feet where the PC's are.
 - Particle effects are drawn from their emitter settings; the PC's flame is a little narrower and redder, and sparks
@@ -342,8 +371,9 @@ were taken with the gamepad shown.
   only partly read. Balloons draw the right bubble and icon with a simple pop, not the PC's keyframes.
 - Events wander and chase with step speeds and pauses measured at -3, 0 and 3 and interpolated between; the PC's
   choice of direction when a chaser is blocked, and whether events walk during menus, were not pinned down.
-- Commands 58, 68 and 77 are logged and skipped, and 56's message for forgetting a skill is not done; Colette uses
-  none of them, and Sacred only in its debug and CG rooms. Command 55 gives a hero experience (Sacred's ending), and
+- Command 58 is logged and skipped, and 56's message for forgetting a skill is not done; Colette uses neither, and
+  Sacred 58 only in its debug room. Commands 68 and 77 keep the menu shut while either is on (Sacred's CG viewer turns
+  both on and off together, so which does what is unknown). Command 55 gives a hero experience (Sacred's ending), and
   command 70 reads the play time only for its hours, minutes and seconds. Command 76 stops a sound effect.
 - The inn was compared with the PC in Colette's town and at Sacred's サンプール; the shop was, in Sacred's weapon shop, with its quantity box. The shop's hero face is cropped at a fixed place that fits Sacred's faces. The party order page is not in
   these games' menus. Where a slot's page shows a second to fourth hero is a guess (two columns); both games have one
@@ -362,16 +392,23 @@ were taken with the gamepad shown.
   them; scrolling textures (`uscrollspeed`, the noon clouds) and particle effects are not drawn.
 - Sacred's castle courtyard averages about 13 ms a frame on the Linux VM, with its 99th percentile (about 19 ms) over
   16.7 ms while other work runs; in the app on Apple silicon it holds 60 (above).
-- Sacred's queen fight was played in VNDegen only.
-- In Sacred's cursed places (the town and castle dungeons, the cursed land, the last dungeon and its final room) the
-  PC tints the sea outside the map purple, and the battle backgrounds there with it; the runtime draws the outside's
-  sea chip in its own blue.
-- Sacred's power spots, its CG and debug rooms and the post-game after the ending haven't been played in VNDegen. The
-  four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen loses it, and
+- Past the map's edge under a noon sky with the sun on, both games' PC players draw nothing; on a dark map (Sacred's
+  last dungeon and cursed places) the PC darkens that empty background with the map's light, where the runtime shows
+  the noon sky's white.
+- Sacred's queen fight was lost on the PC and in VNDegen alike from the same save with attacks only, and won in
+  VNDegen with healing; a win on the PC wasn't played.
+- Sacred's post-game fights hit harder on the PC: from the same full-HP save, attacking only, the dragon girl's
+  竜王（予定） beats the party on the PC and loses in VNDegen. The PC's dragon hits ロイ (defence 265 on both status
+  pages) for 72 to 73, above the attack formula's 61 to 68, and lands critical hits for about twice that several
+  times a fight. With healing VNDegen wins it; the last fight with リリアーヌ was likewise won in VNDegen with healing
+  and lost on the PC attacking only.
+- The status page shows ロイ's speed with 風のブーツ as 164; the PC shows 144, as if the boots' speed field didn't count
+  there. Whether it counts in battle wasn't measured.
+- Sacred's second power spot runs the same script as the others and wasn't played; the third was played in VNDegen
+  only. Its debug room isn't
+  reachable in play and wasn't run. The four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen loses it, and
   the PC's odds at that level weren't measured. The six 炎の悪魔 in the volcano win against N's party (levels 17, 14
   and 11) on the PC and in VNDegen alike; both were won at levels 20 to 22.
-- Choosing an ally for a skill in battle takes up and down as well as left and right; the PC moves only with left and
-  right.
 - Sacred's dragon tower base (about 108,000 triangles in view) takes 12 to 19 ms a frame in the runtime on Apple
   silicon under load and fell below 60 frames a second while other builds ran; not measured on a quiet machine.
 - The PC pulses the cursor row of a choice window about once a second; the runtime draws it steady, as in the menus.

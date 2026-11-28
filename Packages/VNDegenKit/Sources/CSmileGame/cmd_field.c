@@ -57,6 +57,7 @@ bool sgi_move_one(SG *g, const Cmd *c) {
         sg_log(g, "move event %d code %d blocked", i, cmd_int(c, 0));
         return false;
     }
+    a->ev[i].moveThrough = true;
     a->ev[i].moveDir = dir;
     a->ev[i].moveLeft = 1;
     a->ev[i].moveSpeed = 4.0f;
@@ -175,6 +176,11 @@ bool sgi_exec(SG *g, const Cmd *c, bool *busy) {
     case 66:
         g->e.save.config[1] = cmd_int(c, 0) == 0;
         sg_log(g, "encounters %s", cmd_int(c, 0) == 0 ? "on" : "off");
+        return true;
+    case 68:
+    case 77:
+        *(c->type == 68 ? &g->interp.a.menuOff68 : &g->interp.a.menuOff77) = cmd_int(c, 0) != 0;
+        sg_log(g, "command %d: menu %s", c->type, cmd_int(c, 0) != 0 ? "off" : "on");
         return true;
     case 70: random_variable(g, c); return true;
     case 56: learn_skill(g, c); return true;

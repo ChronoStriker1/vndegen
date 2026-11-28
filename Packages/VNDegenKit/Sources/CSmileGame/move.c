@@ -62,15 +62,22 @@ bool sg_step_free(SG *g, int fromX, int fromZ, int h0, int x, int z, int self) {
     if (h0 != h1 && (abs(h1 - h0) > 1 || !(on_stairs(m, x, z) || on_stairs(m, fromX, fromZ)))) return false;
     if (across_ramp(m, fromX, fromZ, x, z)) return false;
     if (self < 0 && h1 == m->height[(size_t)z * (size_t)m->w + (size_t)x] && sg_cell_water(g, x, z)) return false;
-    if (self >= 0 && occupies(&f->player, x, z)) return false;
+    return !sg_cell_blocked(g, x, z, self);
+}
+
+bool sg_cell_blocked(SG *g, int x, int z, int self) {
+    Field *f = &g->field;
+    if (self >= 0 && occupies(&f->player, x, z)) return true;
     const SgaState *st = &g->interp.a;
-    bool sheets = st->evCount == f->npcCount && guid_eq(st->mapId, m->id);
+    bool sheets = st->evCount == f->npcCount && guid_eq(st->mapId, f->map.id);
     for (int i = 0; i < f->npcCount; i++) {
-        if (i == self || !f->npcs[i].visible || !occupies(&f->npcs[i], x, z)) continue;
-        if (sheets && st->ev[i].sheet >= 0 && !st->ev[i].sheets[st->ev[i].sheet].solid) continue;
-        return false;
+        if (i == self || !occupies(&f->npcs[i], x, z)) continue;
+        const SgaSheet *sh = sheets && st->ev[i].sheet >= 0 ? &st->ev[i].sheets[st->ev[i].sheet] : NULL;
+        if (!f->npcs[i].visible && !(sh && sh->solid && sh->trigger == TRIG_TOUCH)) continue;
+        if (sh && !sh->solid) continue;
+        return true;
     }
-    return true;
+    return false;
 }
 
 static const int kDx[4] = {0, 1, 0, -1}, kDz[4] = {-1, 0, 1, 0};
