@@ -158,12 +158,55 @@ static void test_battle_skills_are_learned_list(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static int count_pixels(SG *g, int r0, int r1, int g0, int g1, int b0, int b1) {
+    int n = 0;
+    for (int i = 0; i < g->w * g->h; i++) {
+        u32 c = g->fb[i];
+        int r = (int)(c & 0xff), gr = (int)(c >> 8 & 0xff), b = (int)(c >> 16 & 0xff);
+        n += r >= r0 && r <= r1 && gr >= g0 && gr <= g1 && b >= b0 && b <= b1;
+    }
+    return n;
+}
+
+static int meiri_skin(const char *dir, bool fallen, int *dim) {
+    SG *g = new_game(dir);
+    if (!g) return -1;
+    const Tables *t = &g->b.tables;
+    for (int i = 0; i < t->heroCount; i++)
+        if (!strcmp(t->heroes[i].name, "メイリ")) party_add_hero(g, t->heroes[i].id);
+    Member *m = &g->b.party.members[g->b.party.count - 1];
+    member_set_level(t, m, 20);
+    m->hp = fallen ? 0 : member_max_hp(t, m);
+    BattleSetup s;
+    memset(&s, 0, sizeof s);
+    guid_parse("aa908f92-28de-4d23-a1eb-592da0543644", &s.background);
+    for (int i = 0; i < t->monsterCount && !s.count; i++)
+        if (!strcmp(t->monsters[i].name, "スライムＬＶ01")) s.monsters[s.count++] = t->monsters[i].id;
+    battle_seed(g, 5);
+    sg_battle_start(g, &s);
+    for (int k = 0; k < 2000 && sg_battle_active(g) && strcmp(battle_phase(g), "command"); k++) run(g, 16);
+    run(g, 2000);
+    int bright = count_pixels(g, 240, 255, 165, 195, 130, 160);
+    *dim = count_pixels(g, 50, 80, 35, 60, 25, 50);
+    vnsmilegame_close((VNSmileGame *)g);
+    return bright;
+}
+
+static void test_fallen_hero_lies_dim(const char *dir) {
+    int dimUp = 0, dimDown = 0;
+    int up = meiri_skin(dir, false, &dimUp), down = meiri_skin(dir, true, &dimDown);
+    CHECK(up > 200);
+    CHECK(down >= 0 && down * 10 < up);
+    CHECK(dimDown > dimUp + 100);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
         test_escape_gate_keeps_lap(colette);
         test_prison_blank_last_line(colette);
         test_battle_skills_are_learned_list(colette);
+        test_fallen_hero_lies_dim(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

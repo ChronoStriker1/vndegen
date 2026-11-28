@@ -1317,6 +1317,9 @@ six; her table's level 1 ヒーリング and ファイア are not offered. サ�
 - マンドラゴラＬＶ03's パニックボイスLV02 (power 0, all heroes, confusion, hit 78) took 6 HP from each hero on the PC;
   the runtime gives a power-0 skill 1. Confusion landed on ダーク and `ダークは混乱から回復した！` showed after all the
   turn's actions; the runtime ends confusion when the fighter's own turn comes.
+- A fallen hero lies in its `keepdown` motion (メイリ's `w_majyo001_keepdown.png`), after its `KO` motion when it has
+  one, dark and see-through: on 裸のドラコ's black backdrop the PC drew メイリ's at a quarter of the image's colours, and
+  on the tower floor the floor showed through her. The runtime draws it at half brightness and half opacity.
 
 ### Saves
 

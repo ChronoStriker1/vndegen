@@ -14,7 +14,7 @@ enum { MON_ATTACK = 0, MON_WATCH = 2, MON_SKILL = 3, MON_CHARGE = 4, MON_FLEE = 
 
 enum { MAX_FIGHTERS = 16, MAX_CMDS = 8, MAX_LIST = 64 };
 
-enum { MO_WAIT, MO_ATTACK, MO_DAMAGE, MO_GUARD, MO_KO, MO_SKILL, MO_COUNT };
+enum { MO_WAIT, MO_ATTACK, MO_DAMAGE, MO_GUARD, MO_KO, MO_SKILL, MO_KEEPDOWN, MO_COUNT };
 
 enum { ST_POISON = 1, ST_SLEEP = 2, ST_PARALYSIS = 4, ST_CONFUSION = 8, ST_CHARM = 16, ST_DEATH = 32 };
 
@@ -34,6 +34,7 @@ static const float kFrontLift = 2.4f;
 static const int kActMs = 1250;
 static const int kHitMs = 450;
 static const float kHeroScale = 1.29f;
+static const u16 kFallenShade = 128;
 static const float kMonsterScale = 0.63f;
 static const float kPartyX = 2.83f;
 static const float kPartyZ = 2.57f;
@@ -275,7 +276,7 @@ static const SgrRec *res_record(SG *g, Guid id) {
 }
 
 static void load_motions(SG *g, Fighter *f) {
-    static const char *names[MO_COUNT] = {"wait", "attack", "damage", "guard", "KO", "skill"};
+    static const char *names[MO_COUNT] = {"wait", "attack", "damage", "guard", "KO", "skill", "keepdown"};
     const SgrRec *rec = res_record(g, f->graphic->id);
     if (!rec) return;
     Rd r = rd_make(rec->body, rec->size);
@@ -1383,7 +1384,7 @@ void battle_close(SG *g) {
 static float clip_length(Model *m, const char *name);
 static const char *motion_name(Model *m, int pose, bool won);
 
-static u32 pose_length(Fighter *f) {
+static u32 pose_length(const Fighter *f) {
     if (f->model) {
         const char *mo = motion_name(f->model, f->pose, false);
         float len = mo ? clip_length(f->model, mo) : 0;
@@ -1502,6 +1503,22 @@ static void draw_billboard_ex(SG *g, const Cam *cam, const Image *im, int sx, in
     }
 }
 
+static void draw_billboard_tinted(SG *g, const Cam *cam, const Image *im, int sx, int sy, int sw, int sh, float x, float y, float z, float scale, u16 shade) {
+    float w = (float)sw / 48.0f * scale, h = (float)sh / 48.0f * scale;
+    float p = cam->pitch * 3.14159265f / 180.0f, yaw = cam->yaw * 3.14159265f / 180.0f;
+    float tall = h / cosf(p);
+    float rx = cosf(yaw) * w / 2, rz = sinf(yaw) * w / 2;
+    float u0 = (float)sx / (float)im->w, u1 = (float)(sx + sw) / (float)im->w;
+    float v0 = (float)sy / (float)im->h, v1 = (float)(sy + sh) / (float)im->h;
+    float inset = 0.5f / (float)im->w;
+    Vert va = {x - rx, y + tall, z - rz, u0 + inset, v0, 1}, vb = {x + rx, y + tall, z + rz, u1 - inset, v0, 1};
+    Vert vc = {x + rx, y, z + rz, u1 - inset, v1, 1}, vd = {x - rx, y, z - rz, u0 + inset, v1, 1};
+    Tri t1 = {{va, vb, vc}, im, true, false, 0, 0, 0, {shade, shade, shade, shade}};
+    Tri t2 = {{va, vc, vd}, im, true, false, 0, 0, 0, {shade, shade, shade, shade}};
+    r3_tri_ex(&g->r3, cam, &t1, TRI_BLEND, TF_NOZWRITE);
+    r3_tri_ex(&g->r3, cam, &t2, TRI_BLEND, TF_NOZWRITE);
+}
+
 static void draw_billboard(SG *g, const Cam *cam, const Image *im, int sx, int sy, int sw, int sh, float x, float y, float z, float scale) {
     draw_billboard_ex(g, cam, im, sx, sy, sw, sh, x, y, z, scale, false);
 }
@@ -1514,7 +1531,7 @@ static float clip_length(Model *m, const char *name) {
 }
 
 static const char *motion_name(Model *m, int pose, bool won) {
-    static const char *names[MO_COUNT] = {"wait", "attack", "damage", "guard", "ko", "skill"};
+    static const char *names[MO_COUNT] = {"wait", "attack", "damage", "guard", "ko", "skill", "keepdown"};
     if (won && model_has_motion(m, "win")) return "win";
     if (model_has_motion(m, names[pose])) return names[pose];
     return model_has_motion(m, "wait") ? "wait" : NULL;
@@ -1575,6 +1592,12 @@ static void draw_fighter(Battle *b, const Fighter *f, bool active) {
     if (f->monster) {
         draw_billboard(g, cam, im, 0, 0, im->w, im->h, f->x, y, f->z, kMonsterScale);
         if (f->flashMs) draw_billboard_ex(g, cam, im, 0, 0, im->w, im->h, f->x, y, f->z, kMonsterScale, true);
+        return;
+    }
+    if (f->hp <= 0 && f->motion[MO_KEEPDOWN] && !(f->motion[MO_KO] && f->poseMs < pose_length(f))) {
+        const Image *kd = f->motion[MO_KEEPDOWN];
+        int cw = kd->w / f->motionFrames[MO_KEEPDOWN];
+        draw_billboard_tinted(g, cam, kd, (f->motionFrames[MO_KEEPDOWN] - 1) * cw, 0, cw, kd->h, f->x, y, f->z, kHeroScale, kFallenShade);
         return;
     }
     int pose = f->motion[f->pose] ? f->pose : MO_WAIT;
