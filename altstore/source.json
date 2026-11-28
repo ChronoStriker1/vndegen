@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.61.11",
+          "buildVersion": "3884",
+          "date": "2026-11-28T05:05:51Z",
+          "localizedDescription": "False Myth 2 plays through its first dungeon and the story after it.\n\n## Downloads\n\n- `VNDegen-0.61.11-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.61.11.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.61.11-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **False Myth 2:** its dungeons draw: the floor, water, walls and objects are built from the map's tiles, which the runtime numbered differently from Wolf RPG Editor, and the hero walks on past the first step instead of stopping.\n- **False Myth 2:** the dungeon book, the tutorial panels and the menus show their English layout, with the blur behind the panels, the X button in the battle's \"Hold: End Turn\" label, the skill chart's diamond and the choice box sized as on the PC.\n- **False Myth 2:** enemies keep their own look when hit, holding X skips a scene to its end, and the barrier in front of the dungeon's exit opens.\n- **Wolf RPG Editor:** pictures with four free corners, the effect command's blur and its zoom, angle and opacity corrections, `\\img` and `\\isize` in text, and the message codes `\\>`, `\\<` and `\\^`.\n- **Wolf RPG Editor:** text has a shadow only when the game turns it on (system variable 21), and `\\E` after `\\wE` outlines at width 1 again.\n\n## Known limits\n\n- **False Myth 2:** past the South Tower after the first dungeon it hasn't been played in VNDegen, and no shop has been reached.\n- **False Myth 2:** its dungeons and battles hold close to 60 fps but hitch for a moment every few seconds (#206).\n- **Wolf RPG Editor:** characters move a whole tile at a time, where the PC moves False Myth 2's hero in half tiles; a save made on a tile with a blocked quarter loads on the PC with the hero unable to move (#206).\n\n## What wasn't tested\n\n- Real iPhones and iPads.\n- A save made while False Myth 2's party is hidden: no such save point was reached.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.61.11/VNDegen-0.61.11.ipa",
+          "size": 133272805,
+          "sha256": "79a522f5a973b2b8988ae5b33d734a32c7c4bd584ab347f915147c4f7b9b8f09",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.61.10",
           "buildVersion": "3865",
           "date": "2026-11-28T04:54:39Z",
