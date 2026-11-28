@@ -154,6 +154,7 @@ typedef struct SgaState {
     SgaFaceImage *faces;
     int faceCount;
     bool menuOff68, menuOff77;
+    bool playerMoveThrough;
 } SgaState;
 
 void sga_new_game(SG *g);

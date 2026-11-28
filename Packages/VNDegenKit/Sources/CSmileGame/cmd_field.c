@@ -57,6 +57,7 @@ bool sgi_move_one(SG *g, const Cmd *c) {
         sg_log(g, "move event %d code %d blocked", i, cmd_int(c, 0));
         return false;
     }
+    a->ev[i].moveThrough = true;
     a->ev[i].moveDir = dir;
     a->ev[i].moveLeft = 1;
     a->ev[i].moveSpeed = 4.0f;

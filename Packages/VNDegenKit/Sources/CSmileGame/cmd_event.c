@@ -388,6 +388,11 @@ void sga_move_actor(SG *g, Actor *a, int *dir, int *left, float speed, bool thro
     while (*left > 0 && budget > 0) {
         if (!a->moving) {
             a->dir = *dir;
+            int self = a == &g->field.player ? -1 : (int)(a - g->field.npcs);
+            if (!through && sg_cell_blocked(g, (int)floorf(a->x) + dx[*dir], (int)floorf(a->z) + dz[*dir], self)) {
+                *left = 0;
+                break;
+            }
             a->tx = floorf(a->x) + 0.5f + (float)dx[*dir];
             a->tz = floorf(a->z) + 0.5f + (float)dz[*dir];
             a->moving = true;
@@ -407,7 +412,6 @@ void sga_move_actor(SG *g, Actor *a, int *dir, int *left, float speed, bool thro
         }
         a->y = (float)sg_floor_level(g, (int)floorf(a->x), (int)floorf(a->z), (int)lroundf(a->y));
     }
-    (void)through;
     if (*left <= 0) a->moving = false;
 }
 
@@ -415,14 +419,14 @@ void sga_step_moves(SG *g, u32 ms) {
     SgaState *a = &g->interp.a;
     Field *f = &g->field;
     if (a->playerMoveLeft > 0) {
-        sga_move_actor(g, &f->player, &a->playerMoveDir, &a->playerMoveLeft, a->playerMoveSpeed, true, ms);
+        sga_move_actor(g, &f->player, &a->playerMoveDir, &a->playerMoveLeft, a->playerMoveSpeed, a->playerMoveThrough, ms);
         if (!a->playerMoveLeft) {
             a->lastX = (int)floorf(f->player.x);
             a->lastZ = (int)floorf(f->player.z);
         }
     }
     for (int i = 0; i < a->evCount && i < f->npcCount; i++)
-        if (a->ev[i].moveLeft > 0) sga_move_actor(g, &f->npcs[i], &a->ev[i].moveDir, &a->ev[i].moveLeft, a->ev[i].moveSpeed, true, ms);
+        if (a->ev[i].moveLeft > 0) sga_move_actor(g, &f->npcs[i], &a->ev[i].moveDir, &a->ev[i].moveLeft, a->ev[i].moveSpeed, a->ev[i].moveThrough, ms);
 }
 
 bool sga_moves_pending(SG *g) {
@@ -442,7 +446,9 @@ void sga_move_command(SG *g, const Cmd *c, bool player) {
         sg_log(g, "move code %d not known", code);
         return;
     }
+    bool through = c->argCount < 5 || cmd_int(c, 4) != 0;
     if (player) {
+        a->playerMoveThrough = through;
         a->playerMoveDir = dir;
         a->playerMoveLeft = count;
         a->playerMoveSpeed = kWalkCellsPerSec;
@@ -451,6 +457,7 @@ void sga_move_command(SG *g, const Cmd *c, bool player) {
     } else {
         int i = a->eventIndex;
         if (i < 0 || i >= a->evCount) return;
+        a->ev[i].moveThrough = through;
         a->ev[i].moveDir = dir;
         a->ev[i].moveLeft = count;
         a->ev[i].moveSpeed = kWalkCellsPerSec;
