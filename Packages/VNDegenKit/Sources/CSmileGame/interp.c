@@ -11,6 +11,7 @@ static const int kTextPadX = 18, kTextPadY = 19;
 static const int kWrapW = 684;
 static const float kRevealPerMs = 0.12f;
 static const int kCaptionBandPad = 20;
+static const u32 kCloseMs = 267;
 
 static void clear_pages(Interp *ip) {
     for (int i = 0; i < ip->pageCount; i++) free(ip->pages[i]);
@@ -318,6 +319,7 @@ static void start_message(SG *g, const Cmd *c) {
     Interp *ip = &g->interp;
     SgaState *a = &ip->a;
     split_pages(g, ip, cmd_str(c, 0));
+    a->closeWindow = 0;
     a->msgCmd = c->type;
     a->msgPos = cmd_int(c, 1);
     a->faceL = a->faceR = (Guid){{0}};
@@ -391,8 +393,12 @@ static void step(SG *g) {
             start_choices(g, c, here);
             break;
         case CMD_SHOP:
-        case CMD_INN: start_screen(g, c, here); break;
+        case CMD_INN:
+            a->closeWindow = 0;
+            start_screen(g, c, here);
+            break;
         case CMD_BATTLE: {
+            a->closeWindow = 0;
             BattleSetup bs;
             if (!battle_setup_cmd(&bs, c)) break;
             sg_battle_start(g, &bs);
@@ -401,6 +407,7 @@ static void step(SG *g) {
             break;
         }
         case CMD_SCROLL_TEXT: {
+            a->closeWindow = 0;
             bool image = c->argCount > 2 && c->args[2].kind == ARG_GUID;
             ip->scrollText = cmd_str(c, 0);
             ip->scroll = 0;
@@ -432,6 +439,7 @@ static void finish_choice(SG *g, int k) {
     ip->pc = choice_case(&ip->script, a->choiceHeader, k);
     clear_choices(a);
     a->windowOpen = false;
+    a->closeWindow = 0;
     ip->state = ST_RUN;
 }
 
@@ -440,6 +448,7 @@ void interp_update(SG *g, u32 ms) {
     SgaState *a = &ip->a;
     sga_frame(g, ms);
     if (!ip->active) {
+        if (a->closeWindow && (a->closeMs += ms) >= kCloseMs) a->closeWindow = 0;
         if (sga_field_input(g)) step(g);
         return;
     }
@@ -455,6 +464,9 @@ void interp_update(SG *g, u32 ms) {
             } else if (++ip->page >= ip->pageCount) {
                 free(a->lastPage);
                 a->lastPage = sg_strdup(ip->pages[ip->pageCount - 1]);
+                a->closeWindow = a->msgCmd;
+                a->closePos = a->msgPos;
+                a->closeMs = 0;
                 clear_pages(ip);
                 ip->state = ST_RUN;
             } else {
@@ -655,6 +667,23 @@ static void draw_message(SG *g, const char *text, int shown) {
     }
 }
 
+static void draw_closing_window(SG *g) {
+    SgaState *a = &g->interp.a;
+    int left = kCloseMs - (a->closeMs < kCloseMs ? a->closeMs : kCloseMs);
+    int w = kWinW * g->w / 960 * left / (int)kCloseMs, h = kWinH * left / (int)kCloseMs;
+    if (w <= 0 || h <= 0) return;
+    const Res *res = NULL;
+    Image *im;
+    if (a->closeWindow == CMD_FACE_MESSAGE) {
+        res = res_find(&g->res, g->data.settings.windowImage);
+        im = sg_image(g, g->data.settings.windowImage);
+    } else {
+        im = sga_default_window(g, &res);
+    }
+    int cx = kWinX * g->w / 960 + kWinW * g->w / 960 / 2, cy = window_y(g, a->closePos) + kWinH / 2;
+    sga_window(g, im, res, cx - w / 2, cy - h / 2, w, h);
+}
+
 void sg_draw_choice_box(SG *g, char *const *items, int n, int cursor) {
     int maxW = 0;
     for (int i = 0; i < n; i++) {
@@ -737,6 +766,8 @@ void interp_draw(SG *g) {
             ip->a.faceL = ip->a.faceR = (Guid){{0}};
             draw_message(g, NULL, 0);
             ip->a.msgCmd = keep;
+        } else if (ip->a.closeWindow) {
+            draw_closing_window(g);
         }
         draw_choices(g);
     }
