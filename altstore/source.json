@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.61.9",
+          "buildVersion": "3854",
+          "date": "2026-11-28T03:52:01Z",
+          "localizedDescription": "Sacred's post-game, CG room and power spots play.\n\n## Downloads\n\n- `VNDegen-0.61.9-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.61.9.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.61.9-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Changed\n\n- **Sacred (セイクリッド～砕かれた光の冠～)** now plays its post-game on Mac, iPhone and iPad: the dragon in the town, the voyage back to the demon continent, マオー's key, the 初代魔王 and her slimes, the dragon girl at her campfire, リリアーヌ's fight and the last scene. The CG room in the town shows its pictures and replays its scenes, and the power spots work before the ending as on the PC.\n\n## Fixed\n\n- **Smile Game Builder:** in Sacred's port town, pier, bridge, prison cell and CG room the arrow keys follow the turned camera, as on the PC.\n- **Smile Game Builder:** Sacred's CG viewer keeps the player in place while Left and Right switch pictures, and the menu stays shut while it's open.\n- **Smile Game Builder:** an event's scripted walk stops at a character in the way, as on the PC; Sacred's post-game left the player on the far side of the dragon in the town.\n- **Smile Game Builder:** Sacred's sunlit maps no longer draw a band of blue sea past their edge (the purple-sea difference in the cursed places).\n- **Smile Game Builder:** choosing an ally for a skill or item in battle moves with Left and Right only, as on the PC.\n\n- **Smile Game Builder:** Sacred's battle backdrops under a noon sky stay light instead of turning black.\n\n## Known limits\n\n- **Sacred:** the dragon girl's fight and the last fight hit harder on the PC than in VNDegen; ロイ's speed on the status page with 風のブーツ is higher than the PC's; on dark maps such as the last dungeon the PC's empty background is dark grey where VNDegen's is white (#205). The debug room isn't reachable in play.\n\n## What wasn't tested\n\n- Real iPhones and iPads.\n- Sacred's post-game on the iPhone simulator.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.61.9/VNDegen-0.61.9.ipa",
+          "size": 133265165,
+          "sha256": "36b0dd9010728f353b4da2f465ed0442f5e563a65141c57bff09e164fc763cdd",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.61.8",
           "buildVersion": "3839",
           "date": "2026-11-27T23:58:40Z",
