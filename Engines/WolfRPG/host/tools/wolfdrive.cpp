@@ -134,6 +134,11 @@ int main(int argc, char **argv) {
                 std::printf("pic %d kind %d blend %d pat %d %.0f,%.0f anchor %d size %dx%d zoom %.0f/%.0f opacity %.0f \"%.60s\"\n", n,
                             int(p.kind), p.blend, p.pattern, p.x.value(), p.y.value(), p.anchor, p.imageW, p.imageH, p.zoomX.value(),
                             p.zoomY.value(), p.opacity.value(), p.source.c_str());
+            for (auto &[n, p] : game.pictures())
+                if (p.freeForm)
+                    std::printf("pic %d corners %.0f,%.0f %.0f,%.0f %.0f,%.0f %.0f,%.0f\n", n, p.x.value(), p.y.value(),
+                                p.corners[0].value(), p.corners[1].value(), p.corners[2].value(), p.corners[3].value(),
+                                p.corners[4].value(), p.corners[5].value());
         } else if (cmd == "sys") {
             int i;
             while (ss >> i) std::printf("sys %d=%d\n", i, game.systemNumber(i));

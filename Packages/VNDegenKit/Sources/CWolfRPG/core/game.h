@@ -97,6 +97,8 @@ struct Picture {
     std::shared_ptr<const XYImage> xyImage;  // for a picture made from XY arrays
     int windowW = 0, windowH = 0;  // size of a window picture: a window skin stretched, or a shape
     Tween x, y, opacity, zoomX, zoomY, angle, r, g, b;
+    bool freeForm = false;
+    std::array<Tween, 6> corners;
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
     // Effects from the effect command.
     int autoPatternMode = 0;  // 0 none, 1 once, 2 loop, 3 back and forth

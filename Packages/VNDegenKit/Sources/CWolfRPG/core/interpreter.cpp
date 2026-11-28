@@ -1194,6 +1194,13 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         p.zoomY.set(field(18, int32_t(p.zoomY.to)), over);
     }
     p.angle.set(field(10, int32_t(p.angle.to)), over);
+    if (flags & 0x4000000) {
+        if (show) p.freeForm = true;
+        for (size_t i = 0; i < p.corners.size(); i++) {
+            int32_t at = field(19 + i, int32_t(p.corners[i].to));
+            p.corners[i].set(at, show ? 0 : frames);
+        }
+    }
     // Field 12's top byte is 1 when the colour stays as it is. Otherwise the editor stores the colour only when it
     // isn't 100 (WodiLib's PictureDrawBase), so a command without colour fields sets it back to 100: a game can show
     // a picture at colour 0 and fade it in from black with a plain move.

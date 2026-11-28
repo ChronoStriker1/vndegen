@@ -2,6 +2,7 @@
 // the host shows it through Metal; the Linux test host writes it to PNG files.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -52,6 +53,7 @@ public:
     void draw(const Bitmap &src, float x, float y, const DrawOptions &o = {}) {
         draw(src, {0, 0, src.w, src.h}, {x, y, float(src.w), float(src.h)}, o);
     }
+    void drawQuad(const Bitmap &src, RectI from, const std::array<float, 8> &corners, const DrawOptions &o = {});
     void fill(RectF to, uint8_t r, uint8_t g, uint8_t b, uint8_t a, Blend blend = Blend::Normal);
     // Multiplies every pixel's colour by r, g, b (0 to 2), as Wolf's change screen colour does.
     void tint(float r, float g, float b);

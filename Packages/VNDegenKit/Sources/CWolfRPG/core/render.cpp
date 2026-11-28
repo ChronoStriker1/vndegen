@@ -262,6 +262,26 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
         cellW = from.w = p.cutW;
         cellH = from.h = p.cutH;
     }
+    if (p.freeForm) {
+        DrawOptions q;
+        q.opacity = opacity;
+        q.r = float(p.r.value() / 100);
+        q.g = float(p.g.value() / 100);
+        q.b = float(p.b.value() / 100);
+        q.blend = p.blend == 1 ? Blend::Add : p.blend == 2 ? Blend::Subtract : p.blend == 3 ? Blend::Multiply : Blend::Normal;
+        std::array<float, 8> corners{float(p.x.value())};
+        corners[1] = float(p.y.value());
+        for (size_t i = 0; i < p.corners.size(); i++) corners[2 + i] = float(p.corners[i].value());
+        if (float rate = float(p.effectZoom.value() / 100); rate != 1) {
+            float cx = float(p.effectZoomX.value()), cy = float(p.effectZoomY.value());
+            for (size_t i = 0; i < corners.size(); i += 2) {
+                corners[i] = cx + (corners[i] - cx) * rate;
+                corners[i + 1] = cy + (corners[i + 1] - cy) * rate;
+            }
+        }
+        canvas.drawQuad(*img, from, corners, q);
+        return;
+    }
     float zoomX = float(p.zoomX.value() / 100), zoomY = float(p.zoomY.value() / 100);
     // The anchor places the picture by its laid-out size; a text bitmap's margin and a line's offset come on top.
     float sizeW = cellW, sizeH = cellH;

@@ -814,6 +814,7 @@ void Game::updatePictures() {
         for (Tween *tw : {&p.x, &p.y, &p.opacity, &p.zoomX, &p.zoomY, &p.angle, &p.r, &p.g, &p.b, &p.effectZoom, &p.effectZoomX,
                           &p.effectZoomY})
             tw->step();
+        for (Tween &tw : p.corners) tw.step();
         if (p.autoPatternMode && ++p.autoTimer >= p.autoInterval) {
             p.autoTimer = 0;
             int next = p.pattern + p.autoDir;
