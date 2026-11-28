@@ -216,6 +216,7 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     float opacity = float(std::clamp(p.opacity.value(), 0.0, 255.0) / 255);
     if (opacity <= 0) return;
     int divX = std::max(1, p.divX), divY = std::max(1, p.divY);
+    if (divX * divY > 1 && p.pattern < 1) return;
     int cellW = img->w / divX, cellH = img->h / divY;
     int cell = std::clamp(p.pattern - 1, 0, divX * divY - 1);
     RectI from{cell % divX * cellW, cell / divX * cellH, cellW, cellH};
@@ -313,28 +314,33 @@ void Renderer::drawChoices(Canvas &canvas) {
     int maxW = 0;
     for (int i : c.visible) {
         lines.push_back(text_.render(c.items[i], style));
-        maxW = std::max(maxW, lines.back().bitmap.w);
+        maxW = std::max(maxW, text_.measure(c.items[i], style)[0]);
     }
-    float pad = std::max(8.0f, game_.screenHeight() / 48.0f);
-    float lineH = float(text_.lineHeight(style));
-    float w = maxW + pad * 4, h = lineH * lines.size() + pad * 2;
+    const auto &settings = game_.gameDat().settings;
+    float padX = 10, padY = 11, inset = 6;
+    float rowH = float(text_.lineHeight(style));
+    float pitch = float(style.size + (settings.size() > 12 ? settings[12] : style.lineSpacing));
+    float textY = std::floor((pitch - float(style.size)) / 2);
+    float n = float(lines.size());
+    float w = maxW + (padX + inset) * 2, h = pitch * (n - 1) + rowH + padY * 2;
     // Without a message the choices sit low on the left of the screen, as Wolf places them; with one, just above it.
     float x = game_.screenWidth() * 0.1f;
     float bottom = game_.screenHeight() * 0.87f;
-    if (game_.message().active) bottom = game_.screenHeight() - (lineH * 4 + pad * 4);
+    if (game_.message().active) bottom = game_.screenHeight() - (rowH * 4 + padY * 4);
     RectF box{x, bottom - h, w, h};
     // System variable 4 moves the choice window's top to a given height; -1 leaves Wolf's own placement. A game with a
     // picture menu hides the window by moving it far off the screen, as Succubus Prison's title does with -1000.
     if (int top = game_.choiceTop(); top != -1) box.y = float(top);
     if (int center = game_.choiceCenterX(); center != -1) box.x = float(center) - w / 2;
-    game_.setChoiceBox(box.x + pad, box.y + pad, w - pad * 2, lineH);
+    game_.setChoiceBox(box.x + padX, box.y + padY, w - padX * 2, pitch);
     drawWindow(canvas, *images_.get(game_.windowSkin()), box, 0.9f);
     BitmapPtr cursor = images_.get(game_.cursorSkin());
     float blink = 0.6f + 0.4f * float(std::sin(game_.frameCount() * 0.1));
     if (!cursor->empty())
-        drawWindow(canvas, *cursor, {box.x + pad, box.y + pad + c.cursor * lineH, w - pad * 2, lineH}, blink);
+        drawWindow(canvas, *cursor, {box.x + padX, box.y + padY + c.cursor * pitch, w - padX * 2, rowH}, blink);
     for (size_t i = 0; i < lines.size(); i++)
-        canvas.draw(lines[i].bitmap, box.x + pad * 2 - lines[i].origin, box.y + pad + i * lineH - lines[i].origin);
+        canvas.draw(lines[i].bitmap, box.x + padX + inset - lines[i].origin,
+                    box.y + padY + textY + i * pitch - lines[i].origin);
 }
 
 // The text being typed, at the place system variables 40 and 41 give, with a cursor bar after it.

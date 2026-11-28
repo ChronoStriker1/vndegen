@@ -135,6 +135,7 @@ TextStyle baseTextStyle(const Game &game) {
     const auto &settings = game.gameDat().settings;
     if (settings.size() > 11) s.lineSpacing = settings[11];
     if (settings.size() > 10) s.letterSpacing = 0;
+    s.shadow = std::max(0, game.systemNumber(21));
     if (game.screenWidth() == 320 && game.screenHeight() == 240) s.unit = 2;
     return s;
 }
@@ -189,7 +190,7 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
     int lineTop = 0, size = style.size, lineSize = size, lineSpacing = style.lineSpacing, height = 0, face = 0;
     auto color = style.color;
     std::array<uint8_t, 3> edgeColor{0, 0, 0};
-    int edge = 0, edgeWidth = 1, lineFloor = 0;
+    int edge = 0, lineFloor = 0;
     bool lineEmpty = true;
     size_t shown = 0;
     out.segments.push_back({0, 0, 0});
@@ -233,8 +234,8 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
                 break;
             case TextToken::LineSpace: lineSpacing = t.value; break;
             case TextToken::Tighten: spacing = float(style.letterSpacing) - t.value / unit; break;
-            case TextToken::Edge: edge = t.value != 0 ? edgeWidth : 0; break;
-            case TextToken::EdgeWidth: edge = edgeWidth = std::clamp(t.value, 1, 5); break;
+            case TextToken::Edge: edge = t.value ? 1 : 0; break;
+            case TextToken::EdgeWidth: edge = std::clamp(t.value, 1, 5); break;
             case TextToken::EdgeColor: edgeColor = game_.textColor(t.value); break;
             case TextToken::Face: face = std::clamp(t.value, 0, 3); break;
             case TextToken::LineMax:
@@ -353,7 +354,7 @@ TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, 
                 for (int ox = -it.edge; ox <= it.edge; ox++)
                     if (ox || oy) blendCoverage(*it.g, gx + ox, gy + oy, it.edgeColor, 256);
         } else if (style.shadow) {
-            blendCoverage(*it.g, gx + 1, gy + 1, {0, 0, 0}, 192);
+            blendCoverage(*it.g, gx + style.shadow, gy + style.shadow, {0, 0, 0}, 192);
         }
         blendCoverage(*it.g, gx, gy, it.color, 256);
     }

@@ -23,7 +23,7 @@ struct TextStyle {
     std::array<uint8_t, 3> color{255, 255, 255};
     int lineSpacing = 4;    // extra pixels between lines
     int letterSpacing = 0;  // extra pixels between characters
-    bool shadow = true;     // Wolf draws a dark shadow down and to the right of each character
+    int shadow = 1;
     // The game's text pixels per screen pixel. Wolf draws 320 by 240 games at twice the size, and the pixel counts in
     // \ax, \ay, \mx, \my and \- are in those doubled pixels.
     int unit = 1;
