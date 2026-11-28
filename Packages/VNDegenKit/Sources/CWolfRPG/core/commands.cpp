@@ -601,7 +601,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                 case 1: v = int(p.y.value()); break;
                 case 2: v = p.imageW / std::max(1, p.divX); break;
                 case 3: v = p.imageH / std::max(1, p.divY); break;
-                case 4: v = p.pattern; break;
+                case 4: v = p.shownPattern(); break;
                 case 5: v = int(p.opacity.value()); break;
                 case 6: v = int(p.angle.value()); break;
                 case 7: case 11: v = int(p.zoomX.value()); break;
@@ -1011,7 +1011,7 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.flickerInterval = std::max(1, a1);
                     break;
                 case 0x80: case 0x90: case 0xA0:  // animate the pattern
-                    if (a1 == 0 && a2 == 0) {
+                    if (frames <= 0) {
                         p.autoPatternMode = 0;
                         break;
                     }
@@ -1021,7 +1021,7 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.autoInterval = std::max(1, frames);
                     p.autoTimer = 0;
                     p.autoDir = a2 >= a1 ? 1 : -1;
-                    p.pattern = a1;
+                    p.autoPattern = a1;
                     break;
                 default:
                     unsupported(c);

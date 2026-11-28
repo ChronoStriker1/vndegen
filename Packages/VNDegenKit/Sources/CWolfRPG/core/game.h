@@ -102,7 +102,8 @@ struct Picture {
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
     // Effects from the effect command.
     int autoPatternMode = 0;  // 0 none, 1 once, 2 loop, 3 back and forth
-    int autoFrom = 1, autoTo = 1, autoInterval = 1, autoTimer = 0, autoDir = 1;
+    int autoFrom = 1, autoTo = 1, autoInterval = 1, autoTimer = 0, autoDir = 1, autoPattern = 1;
+    int shownPattern() const { return autoPatternMode ? autoPattern : pattern; }
     int shakePower = 0, shakeSpeed = 0, shakeFrames = 0;
     double shakeOffset = 0;
     int shiftX = 0, shiftY = 0;  // the effect command's draw position shift, added to the position when drawing

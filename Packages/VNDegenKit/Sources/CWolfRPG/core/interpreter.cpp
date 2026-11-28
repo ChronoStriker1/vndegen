@@ -1147,6 +1147,7 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
             fresh.autoInterval = p.autoInterval;
             fresh.autoTimer = p.autoTimer;
             fresh.autoDir = p.autoDir;
+            fresh.autoPattern = p.autoPattern;
             fresh.shakePower = p.shakePower;
             fresh.shakeSpeed = p.shakeSpeed;
             fresh.shakeFrames = p.shakeFrames;

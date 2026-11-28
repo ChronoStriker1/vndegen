@@ -817,17 +817,17 @@ void Game::updatePictures() {
         for (Tween &tw : p.corners) tw.step();
         if (p.autoPatternMode && ++p.autoTimer >= p.autoInterval) {
             p.autoTimer = 0;
-            int next = p.pattern + p.autoDir;
+            int next = p.autoPattern + p.autoDir;
             int lo = std::min(p.autoFrom, p.autoTo), hi = std::max(p.autoFrom, p.autoTo);
             if (next < lo || next > hi) {
                 if (p.autoPatternMode == 1) p.autoPatternMode = 0;
                 else if (p.autoPatternMode == 2) next = p.autoFrom;
                 else {
                     p.autoDir = -p.autoDir;
-                    next = p.pattern + p.autoDir;
+                    next = p.autoPattern + p.autoDir;
                 }
             }
-            if (p.autoPatternMode) p.pattern = next;
+            if (p.autoPatternMode) p.autoPattern = next;
         }
         if (p.shakeFrames > 0) {
             p.shakeFrames--;

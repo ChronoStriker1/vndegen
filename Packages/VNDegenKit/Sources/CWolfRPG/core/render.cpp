@@ -251,9 +251,10 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     float opacity = float(std::clamp(p.opacity.value(), 0.0, 255.0) / 255);
     if (opacity <= 0) return;
     int divX = std::max(1, p.divX), divY = std::max(1, p.divY);
-    if (divX * divY > 1 && p.pattern < 1) return;
+    int pattern = p.shownPattern();
+    if (divX * divY > 1 && pattern < 1) return;
     int cellW = img->w / divX, cellH = img->h / divY;
-    int cell = std::clamp(p.pattern - 1, 0, divX * divY - 1);
+    int cell = std::clamp(pattern - 1, 0, divX * divY - 1);
     RectI from{cell % divX * cellW, cell / divX * cellH, cellW, cellH};
     // A cut shows part of each pattern.
     if (p.cutW > 0 && p.cutH > 0) {
