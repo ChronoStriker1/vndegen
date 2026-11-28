@@ -32,7 +32,7 @@ The game is in Japanese, as on the PC.
 - **Controls** start on the RPG Maker layout: A confirms, B cancels, Y and Menu open the game's menu, X dashes. On a
   touch screen, a tap outside the touch gamepad confirms, as a click does on the PC, and holding a finger on the map
   opens the menu.
-- **What isn't there yet:** battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping, the odds of a state) are close estimates of
+- **What isn't there yet:** battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, escaping, the odds of a state) are close estimates of
   the PC's. Known limits below lists the rest.
 
 ## Sacred
@@ -341,6 +341,9 @@ were taken with the gamepad shown.
   battle, the poison bubbles coming and going, the bookshelf's vertex colours and no round shadow under the warp gates.
 - `sgtest_T`: Colette's post-game against the PC: the North Tower's escape gate keeping the lap, the blank page after
   a full message in the castle basement, and battle skills taken from the learned list alone.
+- `sgtest_V`: battle light and skills against the PC: skill damage and heals as measured, ドラゴンサンダー's 124 in a
+  battle, the campfire battle's snow in the field's light with ロイ's knight, and 王家の洞窟's encounter as dark as the
+  PC's.
 - `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
   switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
   fades per player version and Colette's opening music.
@@ -351,7 +354,7 @@ were taken with the gamepad shown.
   裸のドラコ's battle with plain attacks, and VNDegen won it with skills. Leaving the tower by a gate and resting keeps
   the lap, as the tower's adventurer says.
 - The odds that a state lands are inferred: マンドラゴラ's パニックボイスLV02 confuses most of the party at once in
-  VNDegen. On the PC it took 6 HP from each hero (round 6) and 7 in a later fight where VNDegen takes 1, and the PC
+  VNDegen. Its damage now matches the PC's (3 % of each hero's maximum HP: 6 or 7), and the PC
   showed ダーク's recovery from confusion after every action of the turn, where VNDegen recovers a fighter when its
   own turn comes. Colette's player shows no action bar for these turns, so the casts and the confusions couldn't be
   counted from captures.
@@ -361,15 +364,19 @@ were taken with the gamepad shown.
   that the PC attaches to the scene (rain, snow) haven't been compared.
 - Effects play their sheet's cells in order; the keyframe timeline inside each effect (positions, scales, screen
   flashes) is not read. The camera does not push towards the acting fighter as the PC's does.
-- Skill damage, escape chance, defend and charge, the chance that a state lands and the recovery from sleep,
-  paralysis, confusion and charm are inferred (see `docs/smilegame-cleanroom.md`). Healing skills restore their share
-  of maximum HP as Sacred's ヒール does on the PC; the power and magic added for Colette's heals are inferred.
-- Normal and critical monster hits follow the PC's measured means at attack 260 and 350 within a few points, but the
-  PC's spread isn't reproduced: ロイ without armour took 71 or 72 every time where the runtime draws 70 to 77, and
-  アリア at defence 360 took up to 49 where the runtime stops at 47. A critical hit at defence 169 was 160 on the PC
-  and 166 to 184 in the runtime. How a hero's level enters is a fit, not a measured rule.
-- Sacred's ドラゴンサンダー did exactly 124 to every hero at any defence (62 through a shield that halves all
-  elements, 122 to マオー); the runtime's skill formula subtracts defence and gives ロイ about 65.
+- Escape chance, defend and charge, the chance that a state lands and the recovery from sleep, paralysis, confusion
+  and charm are inferred (see `docs/smilegame-cleanroom.md`). Skill damage and heals follow the rule measured on both
+  PC players: the skill's power plus its share of the target's maximum HP.
+- Normal and critical monster hits follow the PC's measured means at attack 260 and 350 within a few points. The
+  spread looks like the runtime's: ロイ without armour took 71 or 72 in round 7's nine hits but 75, 76 and 78 in
+  round 8's, where the runtime draws 70 to 77, though アリア at defence 360 took up to 49 where the runtime stops at 47.
+  A critical hit at defence 169 was 160 on the PC and 166 to 184 in the runtime. How a hero's level enters is a fit,
+  not a measured rule.
+- Sacred's 雪山 has its sun on with a black sun colour. The PC still lights it with a strong key light (sunlit snow
+  107, 123, 180 at (30, 12)) where the runtime, which multiplies the key by the sun colour, draws 55, 50, 79, so the
+  map is darker in VNDegen. The rule for a black sun colour wasn't pinned down: a white one gives 83, 95, 140.
+- In 王家の洞窟's encounters the PC draws the `Cave` background's walls as grey cobbles where the runtime draws them
+  brown, and in the campfire battle the PC shades the dragon girl's model where the runtime draws it flat and pale.
 - A random encounter brings one to one, two or five of a monster, picked uniformly; the PC brings a lone small
   monster somewhat more often, and stands a group of four or five in two rows where the runtime uses one.
 - Effects (27) play their picture sheet's cells in order over the effect's length; the PC composes layered,

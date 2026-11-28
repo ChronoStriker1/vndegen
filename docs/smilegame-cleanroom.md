@@ -551,8 +551,8 @@ map's centre when absent), `1001` and one `x, z` pair per monster is each monste
 - Critical hits (`{0}の会心の一撃！`): 8 in about 155 of アリア's attacks with a weapon whose critical field is 10, so the
   runtime uses half that field as the percentage. The damage number was hidden behind the slash effect; round 7 (U)
   measured monsters' critical hits and the chance from all equipment.
-- Skill damage: the golem's 落石ＬＶ01 (power 20) took 21 from コレット and missed ダーク twice. The runtime uses
-  (power + magic) × the factor − defence / 4 (one sample, inferred). Healing skills restore power + magic (inferred).
+- Skill damage: the golem's 落石ＬＶ01 (power 20) took 21 from コレット and missed ダーク twice. Round 8 (V) settled the
+  rule: see Skill damage and heals below.
 - Escape: chosen by one member, it is tried at once and ends the party's turn whether or not it works; on a failure
   the monsters still act. Against the golem (speed 40, party 15 and 16) all six tries failed. The runtime uses 50 % ×
   party speed / monster speed, between 5 % and 100 % (inferred).
@@ -684,8 +684,8 @@ plays them for the clip's length.
 
 ### Still inferred
 
-The skill damage formula, healing (power + magic), the escape chance, defend and charge, the state chances above, and
-the recovery of sleep, paralysis, confusion and charm, and the monster count of a random encounter.
+The escape chance, defend and charge, the state chances above, and the recovery of sleep, paralysis, confusion and
+charm, and the monster count of a random encounter. Skill damage and healing were settled in round 8 (V).
 
 ## The field (round 3, delegate I)
 
@@ -1384,3 +1384,52 @@ fades not counting is inferred from the two sizes.
 defending. Colette's player shows no action bar on those turns, so which skill each mandrake used couldn't be read; one
 turn took exactly 7 from all four heroes. The landing rate of confusion and the end-of-turn recovery stay as round 6
 left them.
+
+## Battle light, heroes' looks and skill damage (round 8, V)
+
+Measured on both PC players under Wine from round 7's saves and from runner saves loaded on the PC.
+
+### Light in battle
+
+A battle is drawn on its background map with the light of the map the party is on, not the background map's own.
+Sacred's campfire battle is fought on `Snowfield` (sun on, sun colour 0, 0, 0, key 185, 191, 198, fill 134, 158, 187)
+from the field map (white sun, key 214, 202, 188, fill 188, 174, 156): the PC's snow was 252, 240, 221, warm like the
+field, where the background map's own light gives dark blue-grey (91, 110, 131) and a white sun on it bluish white.
+A random encounter in 王家の洞窟 (no sun, key 52, 50, 73, fill 104, 103, 148) is fought on `Cave` (no sun, fill 231,
+224, 211): the PC's floor was 31, 26, 15, the field's light gives 33, 28, 16 and the Cave's own light 64, 51, 18.
+Colette's player does the same: ドラコ's battle on `バトル背景01_2` (white sun) from the dark grey ドラコ map has floor
+31, 65, 75 on the PC, 41, 79, 89 with the field's light and 65, 109, 119 with the background's. The runtime keeps the
+field's light through the battle. Of the battle commands, 3 of Sacred's 27 and 41 of Colette's 241 have a background
+whose light differs from the map they start on, as do Sacred's random encounters in 迷宮, 魔王城B2F and 王家の洞窟.
+
+### Heroes' looks
+
+ロイ's hero record names a graphic that isn't among Sacred's resources; the party's look for him, which saves
+keep with command 69's changes, is `samples/common/res/character/3D/human_typeA/c_042a.fbx`, and the PC's battles show
+that knight. A hero in battle takes the look the party holds for it, else the hero record's graphic, as the leader on
+the map does.
+
+### Skill damage and heals
+
+A skill's third value after its power (the field healing skills use for their share of maximum HP) works the same way
+for damage: a damaging skill does power + the target's maximum HP × that percentage / 100, rounded down, then scaled by
+the target's element resistance. The user's magic and attack, the target's defence and the random factor don't enter,
+and defending doesn't lower it.
+
+- ドラゴンサンダー (power 120, 1 %, thunder) did 124 to アリア (443) and ロイ (472) at every defence, 122 to マオー (272)
+  and 62 through a shield that halves elements.
+- Against ドラコ (1100 HP; ice and fire −50, holy −100): 聖叩き割り (74, 4 %, holy) 236 twice, アイスエイジ (80, 3 %,
+  ice) 169, メテオボム (84, 6 %, fire) 225, アイスストーム (39, 6 %, ice) 157, ダークストライク (90, 6 %, dark) 156.
+  Casts later in the turn, with ドラコ below full HP, still used her maximum.
+- ドラコスラッシュ (34, 4 %, thunder) took 45 from ダーク (279) and サキュバス (283) and 22 from コレット and メイリ,
+  whose equipment halves thunder. Round 7's 7 from all four defending heroes is パニックボイスLV02 (0, 3 %) at 236 to
+  257 HP, and round 2's 21 from コレット (29) is 落石ＬＶ01 (20, 6 %).
+- Heals follow the same sum: ヒーリング (27, 15 %) gave ダーク (279) 68, ハイヒーリング (70, 15 %) gave サキュバス
+  (283) 112, and ヒール (0, 50 %) half of maximum HP as before.
+
+### The spread of normal hits
+
+Two more fights from round 7's save with both heroes unarmoured (アリア 255 at level 25, ロイ 245 at level 26), read
+from the HP list after each action: the dragon girl's normal hits took 75, 78 and 76 from ロイ and 73, 74 and 69 from
+アリア, with two misses. With round 7's nine hits of 71 or 72, ロイ's range at defence 245 is 71 to 78, about ±5 % of
+the mean, which the runtime's factor of 0.94 to 1.04 already covers; the spread was left as it is.
