@@ -1177,3 +1177,61 @@ backing out on slot 6.
   seconds. The PC's ending showed `プレイ時間` and `7時間14分19秒` on one page for
   `プレイ時間/\Variable[15]時間\Variable[16]分\Variable[17]秒`, then THANK YOU FOR PLAYING on the next.
 - `\Variable[n]` in a message is variable n's value.
+
+## Colette's post-game (round 6, T)
+
+### The North Tower's laps
+
+- Variable 10 counts the laps from 0. 15F's exit (26,22) raises it and sends the party to 1F (26,8); on the fifth lap
+  (10 = 4) it shows `強い妖気を感じる・・・` and sends them to ドラコ's map (8,33) instead. The floor captions read
+  `幽玄の塔 N週目 NNF`, and from 10 = 5 `幽玄の塔MAX`.
+- Each floor's escape gate is two events on one cell with no sheet conditions: an older one that sets variable 10 to
+  0 and sends the party to the world map's 31,41, and a later, invisible one that keeps the lap and sends them to 40,11
+  beside the tower. Escaping from lap 3's 1F on the PC kept variable 10 at 2 and put the party at 40,11, as the
+  tower's adventurer promises (`途中で戻っても、周回はリセットされない`). On a cell with several touch events the PC runs
+  the last one. The runtime starts it on walking into the cell when the cell also holds a visible touch event (the
+  gate's model), as before.
+- On 15F the first lap's ゾンビ is a スライム on the second, whose defeat runs its scene (スライムＨ) and returns to
+  15F; the third lap has none (`今回は敵がいないようだ`) and a chest with エリクサー. These two were played in the
+  runner only. On the fourth lap the statue (19,22) sets variable 1
+  to 17 and switch 24 and shows the caption `新たな調教が思い浮かんだ！『騎乗位中出し』`. The PC showed the same two
+  messages and caption from the same save.
+
+### The castle basement
+
+The throne room's door (10,4) leads to the log room (ログ) and its passage at 0,16 to the basement (地下牢), where
+Colette's event (trigger 5) offers 話す, 陵辱する（騎乗位） and 城に戻る while variable 1 is 17. The scene ends with
+variable 1 at 18 and the choice 話す, 陵辱する, 城に戻る. From the same save the PC played the same messages, and after
+城に戻る its save in the throne room matched the runner's in every variable, switch, hero and item.
+
+- `さっさと脱いで、俺の上にまたがれよ。` has three lines and a final line break. The PC shows the fourth, empty line
+  as a page of its own and waits on an empty window; the runtime now does the same when a message ends with one line
+  break right after a full page.
+- After a message the PC keeps the empty message window under the next choice; the runtime doesn't. The PC's
+  basement wall shows pillars that the runtime's view leaves out.
+
+### ドラコ
+
+Her map's event at 16,27 starts two battles in a row: ドラコ (1100 HP) and 裸のドラコ (1800 HP), then her scene, a
+return to the world map's 40,12 and the developers' message (`Congratulations！！`, `おめでとうございます。`). The PC's
+first turn from the same save: コレットファイナルスラッシュ took 292 (the runtime's took 274 to 276), and 毒の泉 took 3
+from each hero and poisoned them. With plain attacks the party at levels 20 and 21 beat ドラコ and lost to 裸のドラコ
+on the PC and in the runtime; the runtime won both with skills.
+
+### Skill lists
+
+A hero's battle skill list and the menu's skill page hold the learned list alone, in its order. メイリ's saved list
+holds six skills (キュアラル, エリアヒール, ファイアストーム, レイズ, ハイエリアヒール, メテオボム) and the PC shows those
+six; her table's level 1 ヒーリング and ファイア are not offered. サキュバス's page has no アイス (her level 1 skill).
+
+### Battles
+
+- マンドラゴラＬＶ03's パニックボイスLV02 (power 0, all heroes, confusion, hit 78) took 6 HP from each hero on the PC;
+  the runtime gives a power-0 skill 1. Confusion landed on ダーク and `ダークは混乱から回復した！` showed after all the
+  turn's actions; the runtime ends confusion when the fighter's own turn comes.
+
+### Saves
+
+Runner saves loaded in the PC at the same cell and state: lap 2's 4F, lap 3's 1F and 5F, lap 4's 15F beside the
+statue, the basement, ドラコ's map and the world map after her. PC saves loaded in the runner: the world map beside the
+tower after the lap 3 escape and the throne room after the basement scene.

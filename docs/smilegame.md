@@ -20,8 +20,10 @@ walls of ice, fire and lightning, the North Tower (幽玄の塔) to its hall, th
 last scene in the throne room and the staff roll, with the scenes between them and their replays in the log room. The
 optional places were played too: ヤーマ岬 to its minotaur, the golem cave past its walls of fire and lightning to its
 boss and the moon flowers, and the クサレィ catacombs, opened with the key their old keeper sells, to their last floor.
-After the staff roll the post-game opens the North Tower's upper floors. It was all played that far in VNDegen,
-beside the PC. The game is in Japanese, as on the PC.
+After the staff roll the post-game was played to its end: the North Tower's five laps, each changing its floors, the
+second lap's slime, the fourth lap's statue that opens a new scene in the castle basement, and on the fifth lap ドラコ,
+her two battles and her scene, then the developers' closing message. It was all played in VNDegen, beside the PC.
+The game is in Japanese, as on the PC.
 
 - **Saves** are the PC version's own files in the game's `savedata` folder, so a save moves both ways between VNDegen
   and the PC copy, and Ludusavi backs them up as it does on Windows. Save from the game's menu (Escape, X, or Y and
@@ -30,7 +32,7 @@ beside the PC. The game is in Japanese, as on the PC.
 - **Controls** start on the RPG Maker layout: A confirms, B cancels, Y and Menu open the game's menu, X dashes. On a
   touch screen, a tap outside the touch gamepad confirms, as a click does on the PC, and holding a finger on the map
   opens the menu.
-- **What isn't there yet:** see the post-game note under Known limits. Battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping) are close estimates of
+- **What isn't there yet:** battle effects play simpler than on the PC, and the camera doesn't swing in on the fighter who acts. A few battle rules (critical hits, skill damage, escaping, the odds of a state) are close estimates of
   the PC's. Known limits below lists the rest.
 
 ## Sacred
@@ -318,14 +320,22 @@ were taken with the gamepad shown.
 - `sgtest_O`: Colette's optional places against the PC: the edge faces under the noon sky, water that stops the player,
   the golem cave's flame, an event's own switch after it moves the player, the first two heroes standing in front in
   battle, the poison bubbles coming and going, the bookshelf's vertex colours and no round shadow under the warp gates.
+- `sgtest_T`: Colette's post-game against the PC: the North Tower's escape gate keeping the lap, the blank page after
+  a full message in the castle basement, and battle skills taken from the learned list alone.
 - `sgtest_I`: the field against the PC: sheet facing, turn, step and place codes, random variables, the encounter
   switch, learned skills and pictures in saves (byte for byte against PC saves), the help bar after a load, caption
   fades per player version and Colette's opening music.
 
 ## Known limits
 
-- Colette's post-game: VNDegen played the North Tower's floors 6 to 15 on the first of the five laps that lead to
-  ドラコ. The later laps, ドラコ and the prison scene weren't reached in VNDegen and may show problems.
+- Colette's post-game is hard at the levels the story leaves the party (16 to 21 here): VNDegen and the PC both lost
+  裸のドラコ's battle with plain attacks, and VNDegen won it with skills. Leaving the tower by a gate and resting keeps
+  the lap, as the tower's adventurer says.
+- The odds that a state lands are inferred: マンドラゴラ's パニックボイスLV02 confuses most of the party at once in
+  VNDegen. On the PC it took 6 HP from each hero where VNDegen takes 1, and the PC showed ダーク's recovery from
+  confusion after every action of the turn, where VNDegen recovers a fighter when its own turn comes.
+- After a message, the PC keeps an empty message window under the choice that follows; VNDegen shows the choice
+  alone. In the castle basement the PC shows pillars on the back wall that VNDegen's event-room camera leaves out.
 - In battles with three or four heroes the PC draws the first two a little larger than the camera alone would; the
   runtime stands them a cell forward, which puts their feet where the PC's are.
 - Particle effects are drawn from their emitter settings; the PC's flame is a little narrower and redder, and sparks
