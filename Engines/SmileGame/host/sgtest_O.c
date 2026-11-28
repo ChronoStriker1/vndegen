@@ -114,6 +114,10 @@ static void test_switch_after_transfer(const char *dir) {
     if (!g) return;
     Tables *t = &sgb(g)->tables;
     Party *p = &sgb(g)->party;
+    const char *names[3] = {"コレット", "メイリ", "サキュバス"};
+    for (int k = 0; k < 3; k++)
+        for (int i = 0; i < t->heroCount; i++)
+            if (!strcmp(t->heroes[i].name, names[k])) party_add_hero(g, t->heroes[i].id);
     for (int i = 0; i < p->count; i++) {
         member_set_level(t, &p->members[i], 40);
         p->members[i].hp = member_max_hp(t, &p->members[i]);

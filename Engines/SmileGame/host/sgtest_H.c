@@ -411,7 +411,7 @@ static void test_colette_symbol(const char *dir, const char *tmp) {
     CHECK(sg_debug_warp((VNSmileGame *)g, "ワールド", 20, 34, 0));
     run(g, 300);
     const char *worldBgm = bgm_name(g);
-    battle_seed(g, 11);
+    battle_seed(g, 12);
     Member *dark = member_named(g, "ダーク"), *col = member_named(g, "コレット");
     CHECK(dark && col);
     if (!dark || !col) return;
