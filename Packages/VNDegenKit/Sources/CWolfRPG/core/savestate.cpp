@@ -806,9 +806,18 @@ void Game::applySave(const SaveFile &s) {
             a.routeFromCommand = false;
         }
     };
+    auto options = [](Actor &a) {
+        a.fixedDirection = a.through = a.chara.above = false;
+        a.chara.lift = 0;
+        a.jumpHeight = 0;
+    };
     place(hero_, s.party.hero);
+    options(hero_);
     partyTransparent_ = s.party.hero.hidden == 1;
-    for (size_t i = 0; i < party_.size() && i < s.party.members.size(); i++) place(party_[i], s.party.members[i]);
+    for (size_t i = 0; i < party_.size() && i < s.party.members.size(); i++) {
+        place(party_[i], s.party.members[i]);
+        options(party_[i]);
+    }
 
     // The map: its events take their pages from the variables restored above, then their saved positions.
     if (!loadMap(s.map.mapId)) log(format("save: cannot load map %d", s.map.mapId));

@@ -278,6 +278,9 @@ public:
     // The hero's tile and facing, for tests and the debug status.
     std::array<int, 3> heroTile() const { return {hero_.tx(), hero_.ty(), hero_.chara.direction}; }
     std::array<int, 2> heroHalfTile() const { return {hero_.px, hero_.py}; }
+    const Actor &debugHero() const { return hero_; }
+    int32_t debugVariable(int32_t id) { return readVar(id, Thread{}); }
+    bool debugTransparent() const { return partyTransparent_; }
     const std::vector<Tileset> &tilesets() const { return tilesets_; }
     // The hero, party members and map events, in no particular order. The map renderer sorts them.
     std::vector<const Character *> characters() const;
