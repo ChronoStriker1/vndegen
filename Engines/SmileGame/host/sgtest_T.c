@@ -16,7 +16,7 @@ static int failures, checks;
         }                                                                                                              \
     } while (0)
 
-enum { VK_UP = 0x26, VK_LEFT = 0x25, VK_RIGHT = 0x27, VK_OK = 0x0d };
+enum { VK_UP = 0x26, VK_DOWN = 0x28, VK_LEFT = 0x25, VK_RIGHT = 0x27, VK_OK = 0x0d };
 
 static void run(SG *g, int ms) {
     for (int t = 0; t < ms; t += 16) vnsmilegame_frame((VNSmileGame *)g, 16);
@@ -73,10 +73,44 @@ static void test_escape_gate_keeps_lap(const char *dir) {
     vnsmilegame_close((VNSmileGame *)g);
 }
 
+static const char *page_text(SG *g) {
+    Interp *ip = &g->interp;
+    return ip->active && ip->state == 1 && ip->page < ip->pageCount ? ip->pages[ip->page] : NULL;
+}
+
+static void test_prison_blank_last_line(const char *dir) {
+    SG *g = new_game(dir);
+    if (!g) return;
+    g->vars[1] = 17;
+    warp(g, "地下牢", 7, 9, 0);
+    for (int i = 0; i < 20 && !(g->interp.active && g->interp.state == 4); i++) run(g, 100);
+    CHECK(g->interp.active && g->interp.state == 4 && g->interp.a.choiceCount == 3 && !strcmp(g->interp.a.choices[1], "陵辱する（騎乗位）"));
+    press(g, VK_DOWN, 48);
+    press(g, VK_OK, 48);
+    const char *t = NULL;
+    for (int i = 0; i < 10; i++) {
+        t = page_text(g);
+        if (t && !strncmp(t, "さっさと脱いで", strlen("さっさと脱いで"))) break;
+        run(g, 3000);
+        press(g, VK_OK, 48);
+    }
+    CHECK(t && !strncmp(t, "さっさと脱いで", strlen("さっさと脱いで")));
+    run(g, 3000);
+    press(g, VK_OK, 48);
+    t = page_text(g);
+    CHECK(t && !t[0]);
+    press(g, VK_OK, 48);
+    run(g, 1500);
+    t = page_text(g);
+    CHECK(t && !strncmp(t, "コレットはまたがったまま", strlen("コレットはまたがったまま")));
+    vnsmilegame_close((VNSmileGame *)g);
+}
+
 int main(void) {
     const char *colette = getenv("SG_COLETTE");
     if (colette) {
         test_escape_gate_keeps_lap(colette);
+        test_prison_blank_last_line(colette);
     }
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
