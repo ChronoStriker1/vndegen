@@ -43,7 +43,7 @@ tournament, the demon castle and マオー's scene there, the デオズズ volca
 ルディアノ, the town and castle dungeons and the queen, the cursed land, the last dungeon, the last battle and the
 ending, and the post-game after it: the dragon in the town, the ship to the demon continent, マオー's key, the 初代魔王
 and her slimes, the dragon girl at her campfire, リリアーヌ's fight in the castle and the last scene. The CG room in
-the town shows its pictures and replays its scenes, and the first power spot teaches ロイ his spells before the ending.
+the town shows its pictures and replays its scenes, and the power spots teach ロイ his spells before the ending.
 It was played that far in VNDegen, by play. The volcano's six
 炎の悪魔, the queen's fight, the last battle, the ending and the post-game's scenes and fights were played beside the PC
 under Wine from the same saves. The game is in Japanese, as on the PC.
@@ -382,7 +382,8 @@ were taken with the gamepad shown.
   and lost on the PC attacking only.
 - The status page shows ロイ's speed with 風のブーツ as 164; the PC shows 144, as if the boots' speed field didn't count
   there. Whether it counts in battle wasn't measured.
-- Sacred's second and third power spots run the same script as the first and weren't played. Its debug room isn't
+- Sacred's second power spot runs the same script as the others and wasn't played; the third was played in VNDegen
+  only. Its debug room isn't
   reachable in play and wasn't run. The four-golem fight where アリア rejoins was won at level 4 on the PC and in VNDegen; at level 1 VNDegen loses it, and
   the PC's odds at that level weren't measured. The six 炎の悪魔 in the volcano win against N's party (levels 17, 14
   and 11) on the PC and in VNDegen alike; both were won at levels 20 to 22.

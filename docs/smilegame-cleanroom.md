@@ -1245,7 +1245,9 @@ the PC or in the runtime (the first one checked on both, from the same save). Be
 after the queen, through the gate to サンプール) the first one asks whether to strengthen ロイ's magic; yes starts a
 fight with six デビオ and デビコ, and after it command 56 teaches ロイ キュアリー and ファイアーボール. The PC's save after
 it holds the same three learned skills, experience (81,239) and cell as the runner's, and loads in the runner. The
-second and third (three snow monsters; a 暗黒騎士 of 1500 HP) run the same script and weren't played.
+third, reached through the gate to マオー城, sets a 暗黒騎士 of 1500 HP on the party and then teaches レイズ and
+サンダーストーム; it was won in the runner, and the PC's fight from the same save wasn't finished. The second (three
+snow monsters) runs the same script and wasn't played.
 
 ### Battles
 
