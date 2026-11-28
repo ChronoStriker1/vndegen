@@ -1023,8 +1023,8 @@ static int order_cmp(const void *a, const void *b) {
 void field_draw(SG *g) {
     double t0 = now_ms();
     Field *f = &g->field;
-    r3_begin(&g->r3, g->fb, 0xff000000u);
     View *v = g->r3.view;
+    r3_begin(&g->r3, g->fb, v && v->ready && v->look.sky == 0 && v->look.sun ? 0xffffffffu : 0xff000000u);
     if (!f->loaded || !v || !v->ready) return;
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
