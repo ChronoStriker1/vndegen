@@ -147,6 +147,8 @@ struct MessageState {
     size_t shown = 0, total = 0;  // characters typed so far, and in all
     bool instant = false;
     bool heldForChoice = false;  // stays up until the choice after it is answered
+    bool autoClose = false;
+    std::vector<std::pair<size_t, size_t>> instantRanges;
 };
 
 // The string command's keyboard mode while the player types.

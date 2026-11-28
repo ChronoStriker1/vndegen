@@ -719,7 +719,10 @@ void Game::update(const Input &input) {
         } else if (message_.shown < message_.total) {
             if (advance) message_.shown = message_.total;
             else message_.shown++;
-        } else if (advance) {
+            for (auto [from, to] : message_.instantRanges)
+                if (message_.shown >= from && message_.shown < to) message_.shown = to;
+            if (message_.shown == message_.total && message_.autoClose) message_.active = false;
+        } else if (advance || message_.autoClose) {
             message_.active = false;
         }
         // The press that finishes or closes a message is used up, so it doesn't also talk to the event in front.

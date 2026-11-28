@@ -355,7 +355,7 @@ bool Game::step(Thread &t) {
             return true;
 
         case 130: {  // move a character, the hero by default, to a position or another map
-            int target = cmd.arg(0);
+            int target = value(cmd.arg(0), t);
             int x = value(cmd.arg(1), t), y = value(cmd.arg(2), t);
             int mapId = value(cmd.arg(3), t);
             if (target <= -10000) {
@@ -620,10 +620,26 @@ void Game::showMessage(std::string text) {
         if (end < text.size() && text[end] == '\n') end++;
         text.erase(0, end);
     }
+    auto added = [&](size_t i) { return i < systemStrings_.size() ? systemStrings_[i] : std::string(); };
+    text = added(26) + text + added(27);
     if (systemStrings_.size() > 25) systemStrings_[25] = text;
     message_.text = std::move(text);
     message_.total = visibleChars(message_.text);
     message_.active = true;
+    size_t at = 0;
+    bool instant = false;
+    for (auto &tok : parseText(message_.text)) {
+        if (tok.kind == TextToken::AutoClose) message_.autoClose = true;
+        else if (tok.kind == TextToken::Instant && (tok.value != 0) != instant) {
+            instant = tok.value != 0;
+            if (instant) message_.instantRanges.push_back({at, message_.total});
+            else message_.instantRanges.back().second = at;
+        } else if (tok.kind == TextToken::Char || tok.kind == TextToken::Icon || tok.kind == TextToken::Image) {
+            at++;
+        } else if (tok.kind == TextToken::Ruby) {
+            at += visibleChars(tok.base);
+        }
+    }
 }
 
 // The text at a variable address: a string variable's text, or a number written out.

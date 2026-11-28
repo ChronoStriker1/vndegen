@@ -541,7 +541,12 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
             }
             case 16: v = a->chara.pattern; break;
             case 17: v = a->moving(); break;
-            case 20: v = a->chara.chip >= 0 ? a->chara.chip + 1 : 0; break;
+            case 20: {
+                v = a->chara.chip >= 0 ? a->chara.chip + 1 : 0;
+                for (auto &e : events_)
+                    if (&e.actor == a && e.page < 0) v = -1;
+                break;
+            }
             default: v = 0; break;
         }
     } else if (exec == 0x20) {  // map position
