@@ -48,7 +48,7 @@ typedef struct Fighter {
     const MonsterDef *def;
     const char *name;
     i32 hp, maxHp, mp, maxMp;
-    i32 atk, dfn, mag, spd, hit, eva;
+    i32 atk, dfn, spd, hit, eva;
     i32 resist[12];
     i32 element;
     u8 state;
@@ -178,10 +178,9 @@ int battle_critical_damage(int attack, int defense, float spread) {
     return (int)floorf(base * spread + 0.5f);
 }
 
-int battle_skill_damage(int power, int magic, int defense, float spread) {
-    float base = (float)(power + magic) * spread - (float)defense / 4.0f;
-    if (base <= 0) return 0;
-    return (int)floorf(base + 0.5f);
+int battle_skill_damage(int power, int percent, int maxHp) {
+    int dmg = power + maxHp * percent / 100;
+    return dmg > 0 ? dmg : 0;
 }
 
 int battle_exp_for_level(int level) {
@@ -350,7 +349,6 @@ static void add_monster(Battle *b, const MonsterDef *m, float x, float z) {
     f->mp = f->maxMp = m->stats[1];
     f->atk = m->stats[2];
     f->dfn = m->stats[3];
-    f->mag = m->stats[4];
     f->hit = m->stats[5];
     f->eva = m->stats[8];
     f->spd = m->stats[9];
@@ -375,7 +373,6 @@ static void add_member(Battle *b, int index, float x, float z) {
     f->mp = m->mp;
     f->atk = member_attack(TB(g), m);
     f->dfn = member_defense(TB(g), m);
-    f->mag = member_stat(TB(g), m, STAT_MAGIC);
     f->spd = member_speed(TB(g), m);
     f->hit = member_hit(TB(g), m);
     f->eva = member_evasion(TB(g), m);
@@ -742,7 +739,7 @@ static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
     if (friendly) {
         if ((k.states & 32) && t->hp <= 0) t->hp = 1;
         cure(b, t, k.states);
-        int v = (s->power > 0 ? s->power + a->mag : 0) + t->maxHp * s->percent / 100;
+        int v = battle_skill_damage(s->power, s->percent, t->maxHp);
         if (v > 0 && t->hp > 0) {
             t->hp += v;
             if (t->hp > t->maxHp) t->hp = t->maxHp;
@@ -755,7 +752,7 @@ static void apply_skill(Battle *b, Fighter *a, Fighter *t, const SkillDef *s) {
         popup(t, 0, true, false);
         return;
     }
-    int dmg = battle_skill_damage(s->power, a->mag, t->defending ? t->dfn * 2 : t->dfn, battle_spread(&b->rng));
+    int dmg = battle_skill_damage(s->power, s->percent, t->maxHp);
     if (dmg < 1) dmg = 1;
     dmg = element_scale(t, k.element, dmg);
     int before = t->hp;

@@ -231,10 +231,7 @@ static void test_colette(const char *dir) {
     CHECK(damage_set(member_attack(t, colette), golem->stats[3]) == bits((int[]){3}, 1));
     CHECK(damage_set(golem->stats[2], member_defense(t, dark)) & bits((int[]){26}, 1));
     CHECK(damage_set(golem->stats[2], member_defense(t, colette)) & bits((int[]){27}, 1));
-    bool rock = false;
-    u32 rng = 3;
-    for (int i = 0; i < 5000; i++) rock |= battle_skill_damage(20, golem->stats[4], member_defense(t, colette), battle_spread(&rng)) == 21;
-    CHECK(rock);
+    CHECK(battle_skill_damage(20, 6, member_max_hp(t, colette)) == 21);
 
     BattleSetup gs = {0};
     gs.monsters[0] = golem->id;
