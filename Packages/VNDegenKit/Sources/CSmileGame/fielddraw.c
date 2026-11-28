@@ -581,7 +581,7 @@ void view_load(SG *g) {
         v->slopeDir[(size_t)s->z * (size_t)m->w + (size_t)s->x] = (i16)s->kind;
         v->slopeIdx[(size_t)s->z * (size_t)m->w + (size_t)s->x] = (u8)si;
     }
-    v->border = v->look.sky == 0 && sg_player_at_least(g, 1, 8) ? 0 : BORDER;
+    v->border = v->look.sky == 0 && (v->look.sun || sg_player_at_least(g, 1, 8)) ? 0 : BORDER;
     v->chunkW = (m->w + 2 * BORDER + CHUNK - 1) / CHUNK;
     v->chunkH = (m->h + 2 * BORDER + CHUNK - 1) / CHUNK;
     v->chunkCount = v->chunkW * v->chunkH;
