@@ -343,8 +343,13 @@ shot, save, load, pics, sys, state), which makes long play-throughs against the 
 - False Myth 2: past the South Tower after the first dungeon it hasn't been played in VNDegen, and no shop has been
   reached. The party command's other specials (warping the party to the hero, sync, remembering graphics, the
   caterpillar switch) aren't run. No point was reached where the party is transparent and the menu can save, so a save
-  with the hero hidden hasn't been compared with the PC. A save made in VNDegen at the South Tower after the first
-  dungeon loads on the PC at the same place with the same HUD, but there the hero turns without walking; a VNDegen save
-  at the Sanctuary walks on the PC, and the cause hasn't been found.
+  with the hero hidden hasn't been compared with the PC.
+- Characters move a whole tile at a time and a tile blocks only when all four of its passability bits are set. Wolf RPG
+  Editor can move in half tiles, and the manual's specification page says a character can't move while it overlaps a
+  blocked quarter of a tile. False Myth 2 moves in half tiles: on the PC its hero stops half a tile into the South
+  Tower tile at 24,34 (passability 0x21), where VNDegen walks onto it. A save made there in VNDegen loads on the PC at
+  the same place, since the game stores the hero's position in spare variables 9 (3 to 5) and moves the hero there
+  after a load, and on the PC the hero then can't move at all. Saves made on tiles without blocked quarters walk on the
+  PC (the Sanctuary's). Found by swapping each part of the save with one that walks; the save format itself matches.
 - Game.dat's language byte is read only as English (5) or Japanese; the other languages' values aren't known.
 - Of the effect command's map effects only the zoom is drawn; the library uses no other.
