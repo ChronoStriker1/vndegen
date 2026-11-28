@@ -374,7 +374,7 @@ bool sga_field_input(SG *g) {
     }
     if (sg_key_dir(g) == dir) {
         int i = npc_at(g, tx, tz, false);
-        if (i >= 0 && (trigger_of(g, i) == TRIG_EVENT_TOUCH || (trigger_of(g, i) == TRIG_TOUCH && g->field.npcs[i].visible))) {
+        if (i >= 0 && (trigger_of(g, i) == TRIG_EVENT_TOUCH || (trigger_of(g, i) == TRIG_TOUCH && a->ev[i].sheets[a->ev[i].sheet].solid))) {
             sga_start_event(g, i, a->ev[i].sheet);
             if (g->interp.active) return true;
         }

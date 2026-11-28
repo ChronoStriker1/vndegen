@@ -66,8 +66,10 @@ bool sg_step_free(SG *g, int fromX, int fromZ, int h0, int x, int z, int self) {
     const SgaState *st = &g->interp.a;
     bool sheets = st->evCount == f->npcCount && guid_eq(st->mapId, m->id);
     for (int i = 0; i < f->npcCount; i++) {
-        if (i == self || !f->npcs[i].visible || !occupies(&f->npcs[i], x, z)) continue;
-        if (sheets && st->ev[i].sheet >= 0 && !st->ev[i].sheets[st->ev[i].sheet].solid) continue;
+        if (i == self || !occupies(&f->npcs[i], x, z)) continue;
+        const SgaSheet *sh = sheets && st->ev[i].sheet >= 0 ? &st->ev[i].sheets[st->ev[i].sheet] : NULL;
+        if (!f->npcs[i].visible && !(sh && sh->solid && sh->trigger == TRIG_TOUCH)) continue;
+        if (sh && !sh->solid) continue;
         return false;
     }
     return true;
