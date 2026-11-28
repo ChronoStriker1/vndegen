@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.61.13",
+          "buildVersion": "3903",
+          "date": "2026-11-28T09:12:38Z",
+          "localizedDescription": "Sacred's bosses hit closer to the PC's, and fixes to Smile Game Builder's status page, dark maps and message boxes.\n\n## Downloads\n\n- `VNDegen-0.61.13-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.61.13.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.61.13-LGPL-sources.tar`: the exact source of the LGPL libraries in this release. [docs/relinking.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/relinking.md) says how to replace one.\n\n## Fixed\n\n- **Sacred:** monsters' critical attacks (会心の一撃) land as on the PC, and monster hits on high-level heroes are a few points stronger, as measured on the PC. The dragon girl's fight is now about as hard as on the PC.\n- **Smile Game Builder:** an item's speed doesn't change a hero's speed, on the status page or in battle, as on the PC (風のブーツ, 盗賊のブーツ). Accuracy from every equipped item counts (命中の指輪), and so does every item's critical bonus (クリティカルネックレス).\n- **Sacred:** past the map's edge, dark maps such as the last dungeon show their own dark colour instead of white.\n- **Smile Game Builder:** after a message, the closing message box stays under a choice that comes right after it, as on the PC.\n\n## Known limits\n\n- **Smile Game Builder:** skill damage (Sacred's ドラゴンサンダー, Colette's パニックボイス), the spread of normal hits and how often a status ailment lands still differ from the PC (#205).\n- **Sacred:** the campfire battle draws its snow dark and doesn't show ロイ's model (#207).\n\n## What wasn't tested\n\n- Real iPhones and iPads.\n- Saving, quitting and loading again in the Mac app with these changes; saves were checked both ways with the PC in the test runner.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.61.13/VNDegen-0.61.13.ipa",
+          "size": 133272426,
+          "sha256": "e0253a774b8d496d8e908bbb20aa277c199474a51790dbdce342b2956509971f",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.61.12",
           "buildVersion": "3893",
           "date": "2026-11-28T08:35:38Z",
