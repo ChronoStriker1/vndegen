@@ -179,6 +179,7 @@ Agreed with the maintainer on 2026-10-25, and reordered on 2026-11-09. Engine or
 - Sacred plays to its ending, so both Smile Game Builder games do (0.61.8).
 - Sacred's post-game, CG room and power spots (0.61.9).
 - Princess Colette's Great Adventure's post-game, so both Smile Game Builder games play to their end (0.61.10). Smile Game Builder is done for now.
+- False Myth 2 through its first dungeon and the story after it, to the South Tower (0.61.11).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -187,6 +188,7 @@ New bugs get a GitHub issue and a line here.
 - From the new test games (0.56.2): #190's checks were done in 0.58.1, and restoring Wolf pictures from saves in 0.58.2. #187 was fixed in 0.57.2; #188 and #189 needed no change (Tenioha's bar opens with a tap on its strip, and Wolf's save screen takes keys only on the PC too).
 - From the regression sweep of 2026-11-23: #193 was fixed in 0.59.14. #194 and #195 needed no change: Project Hadal's black panels are its empty Load screen, and Fallen Kunoichi waited on an animation that MZ plays only while its page has focus, which a test run in the background didn't have. #196 and #197, web games' links, were fixed in 0.59.15.
 - #205: Sacred's post-game fights hit harder on the PC, its status page shows a higher speed with 風のブーツ, and its dark maps' background is white where the PC's is dark grey (found 2026-11-27).
+- #206: Wolf RPG Editor moves characters by whole tiles where False Myth 2's PC hero moves by half tiles, so a VNDegen save on a tile with a blocked quarter can't walk on the PC; and False Myth 2 stutters for a moment every few seconds while drawing its pictures (found 2026-11-27).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
