@@ -1170,6 +1170,12 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
             fresh.shakeOffset = p.shakeOffset;
             fresh.shiftX = p.shiftX;
             fresh.shiftY = p.shiftY;
+            fresh.shift2X = p.shift2X;
+            fresh.shift2Y = p.shift2Y;
+            fresh.fixZoomX = p.fixZoomX;
+            fresh.fixZoomY = p.fixZoomY;
+            fresh.fixAngle = p.fixAngle;
+            fresh.fixOpacity = p.fixOpacity;
             fresh.effectZoom = p.effectZoom;
             fresh.effectZoomX = p.effectZoomX;
             fresh.effectZoomY = p.effectZoomY;

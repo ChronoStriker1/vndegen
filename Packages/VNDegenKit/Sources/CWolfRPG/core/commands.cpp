@@ -1015,6 +1015,16 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.flickerFrames = frames;
                     p.flickerInterval = std::max(1, a1);
                     break;
+                case 0xB0:
+                    p.shift2X = a1;
+                    p.shift2Y = a2;
+                    break;
+                case 0xC0:
+                    p.fixZoomX.set(a1, frames);
+                    p.fixZoomY.set(a2, frames);
+                    break;
+                case 0xD0: p.fixAngle.set(a1, frames); break;
+                case 0xE0: p.fixOpacity.set(a1, frames); break;
                 case 0x80: case 0x90: case 0xA0:  // animate the pattern
                     if (frames <= 0) {
                         p.autoPatternMode = 0;

@@ -124,7 +124,9 @@ Renderer::Renderer(const Game &game)
     : game_(game), images_(game.files(), game.log), map_(images_, game), text_(game, &images_) {}
 
 // Wolf's window skins are cut into a 3 by 3 grid: the corners stay, and the edges and middle stretch.
-double pictureAngleDegrees(const Picture &p) { return p.kind == PictureKind::Window ? 0 : p.angle.value() / 10; }
+double pictureAngleDegrees(const Picture &p) {
+    return p.kind == PictureKind::Window ? 0 : (p.angle.value() + p.fixAngle.value()) / 10;
+}
 
 void Renderer::drawWindow(Canvas &canvas, const Bitmap &skin, RectF d, float opacity) {
     if (skin.empty()) {
@@ -236,7 +238,7 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
 }
 
 void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
-    if (p.opacity.value() <= 0) return;
+    if (p.opacity.value() + p.fixOpacity.value() <= 0) return;
     const Bitmap *img = nullptr;
     BitmapPtr file;
     float offsetX = 0, offsetY = 0;
@@ -248,7 +250,7 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     }
     if (!img || img->empty()) return;
     if (p.flickerFrames > 0 && (p.flickerFrames / std::max(1, p.flickerInterval)) % 2) return;
-    float opacity = float(std::clamp(p.opacity.value(), 0.0, 255.0) / 255);
+    float opacity = float(std::clamp(p.opacity.value() + p.fixOpacity.value(), 0.0, 255.0) / 255);
     if (opacity <= 0) return;
     int divX = std::max(1, p.divX), divY = std::max(1, p.divY);
     int pattern = p.shownPattern();
@@ -273,6 +275,14 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
         std::array<float, 8> corners{float(p.x.value())};
         corners[1] = float(p.y.value());
         for (size_t i = 0; i < p.corners.size(); i++) corners[2 + i] = float(p.corners[i].value());
+        float fx = float(p.fixZoomX.value() / 100), fy = float(p.fixZoomY.value() / 100);
+        if (fx != 1 || fy != 1) {
+            float mx = (corners[0] + corners[2] + corners[4] + corners[6]) / 4, my = (corners[1] + corners[3] + corners[5] + corners[7]) / 4;
+            for (size_t i = 0; i < corners.size(); i += 2) {
+                corners[i] = mx + (corners[i] - mx) * fx;
+                corners[i + 1] = my + (corners[i + 1] - my) * fy;
+            }
+        }
         if (float rate = float(p.effectZoom.value() / 100); rate != 1) {
             float cx = float(p.effectZoomX.value()), cy = float(p.effectZoomY.value());
             for (size_t i = 0; i < corners.size(); i += 2) {
@@ -283,13 +293,13 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
         canvas.drawQuad(*img, from, corners, q);
         return;
     }
-    float zoomX = float(p.zoomX.value() / 100), zoomY = float(p.zoomY.value() / 100);
+    float zoomX = float(p.zoomX.value() * p.fixZoomX.value() / 10000), zoomY = float(p.zoomY.value() * p.fixZoomY.value() / 10000);
     // The anchor places the picture by its laid-out size; a text bitmap's margin and a line's offset come on top.
     float sizeW = cellW, sizeH = cellH;
     if (p.kind == PictureKind::Window && p.windowW > 0 && p.windowH > 0) sizeW = float(p.windowW), sizeH = float(p.windowH);
     else if (p.kind == PictureKind::Text) sizeW = float(p.imageW), sizeH = float(p.imageH);
     float w = cellW * zoomX, h = cellH * zoomY, aw = sizeW * zoomX, ah = sizeH * zoomY;
-    float x = float(p.x.value() + p.shakeOffset + p.shiftX), y = float(p.y.value() + p.shiftY);
+    float x = float(p.x.value() + p.shakeOffset + p.shiftX + p.shift2X * zoomX), y = float(p.y.value() + p.shiftY + p.shift2Y * zoomY);
     switch (p.anchor) {
         case 1: x -= aw / 2; y -= ah / 2; break;
         case 2: y -= ah; break;
