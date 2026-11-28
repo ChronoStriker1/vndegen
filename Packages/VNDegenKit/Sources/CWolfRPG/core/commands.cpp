@@ -505,8 +505,8 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
     int tile = gameDat_.tileSize();
     if (exec == 0x10) {  // character
         const Actor *a = actorFor(value(c.arg(2), t), t);
-        if (!a) return;
-        switch (info) {
+        switch (a ? info : -1) {
+            case -1: v = -1; break;
             case 0: v = a->tx; break;
             case 1: v = a->ty; break;
             case 2: v = a->tx * 2; break;
