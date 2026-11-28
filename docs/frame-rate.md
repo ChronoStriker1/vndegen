@@ -110,6 +110,10 @@ This is the frame rate check from the roadmap's first plan, now under Finished f
 | Wolf RPG, reused | YUME-SAME, battle, after its image fix | iPad simulator | 60 | 59.4 to 60.0 | 27.3 to 60.0 | 130 s | not recorded | 11-01 | 04606b3 |
 | Wolf RPG | Milky Quest, title, game frames drawn | Mac app, MacBook | 60 | 60.0 to 60.1, was 57.6 | 89.8 to 120.0 display | 40 s | 2.7 | 11-07 | d6d75f6 |
 | Wolf RPG | Milky Quest, title, game frames drawn | Mac app, mini | 60 | 59.9 to 60.0, was 60.0 running 2% fast | 48.4 to 60.0 display | 40 s | 10 | 11-07 | d6d75f6 |
+| Wolf RPG | False Myth 2, Moon-Deceiving Forest floor 1: walking | Mac app, mini | 60 | 58.0 to 59.5 | 18.0 to 30.0 | 55 s | 7.0 to 7.5 | 11-27 | 0fa8717b |
+| Wolf RPG | False Myth 2, first forest battle | Mac app, mini | 60 | 58.1 to 59.3 | 15.6 to 25.7 | 160 s | 7.5 to 8.2 | 11-27 | 0fa8717b |
+| Wolf RPG | False Myth 2, Moon-Deceiving Forest floor 1: walking | iPad simulator | 60 | 52.5 to 59.0 | 4.8 to 24.8 | 50 s | 8.7 to 9.5 | 11-27 | 0fa8717b |
+| Wolf RPG | False Myth 2, first forest battle | iPad simulator | 60 | 54.2 to 59.1 | 5.7 to 24.0 | 200 s | 8.7 to 9.6 | 11-27 | 0fa8717b |
 | AliceSoft System 3, reused | Panyon, tactical battle | Mac app, mini | 60 | 60.0 | 60 | not recorded | not recorded | 10-31 | 2008a53 |
 | AliceSoft System 3, reused | Panyon, tactical battle | iPad simulator | 60 | 60.0 | one hitch | 147 s | not recorded | 10-31 | 2008a53 |
 | AliceSoft System 4, reused | Sengoku Rance, battle | Mac app, mini | 60 | 60.0 | 60 median, 41 lowest | 250 s | low | 10-31 | not recorded |
@@ -155,6 +159,7 @@ On the MacBook's 120 Hz display a 60 fps game reads correctly: WebKit's page run
 ## Measured with limits
 
 - Karryn's Prison: the battle ran into its first turn and stayed in that turn's phase while measured, with Karryn and four enemies on screen. The prison floors weren't reached.
+- False Myth 2: its dungeon floors and battles draw about 1,700 pictures a frame on the CPU, most of them hidden; a sample of the Mac app spends three quarters of the main thread in `Canvas::draw` for pictures. Averages hold near 60, but each 10 s has hitches of 50 to 120 ms (1% lows of 15 to 30 on the Mac). The iPad simulator's lowest windows include the moments the agent-device runner took a screenshot. Not fixed.
 - Wolf Girl With You: its title is a full-screen animation of a character and moving shadows. Whether a few taps entered play isn't known, so its heaviest scenes may not be covered.
 - Fallen Kunoichi: the map measured is the one the game calls its title screen, with 14 pictures, because the game skips the usual title. Its story maps weren't reached.
 - KiriKiri: Violated Hero IV's title needs clicks on buttons, and its battles weren't reached. A script plays the game's clip through the same plugin instead, and draws a clip frame each tick, 2 to 4 times the clip's 30 fps, so it asks more than the game does. It isn't the game's scene. The movie log gives frames shown and dropped but no 1% low, and the 5 s logo plays while the game is still loading: the display's own 1% low over that first 10 s window was 58.9 on the Mac and 20.8 on the simulator.
