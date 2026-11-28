@@ -306,6 +306,20 @@ static int trigger_of(SG *g, int npc) {
     return ev->sheet >= 0 ? ev->sheets[ev->sheet].trigger : 0;
 }
 
+static int touch_at(SG *g, int x, int z, bool pushed) {
+    Field *f = &g->field;
+    int last = -1;
+    bool pushable = false;
+    for (int i = 0; i < f->npcCount && i < g->interp.a.evCount; i++) {
+        if ((int)floorf(f->npcs[i].x) != x || (int)floorf(f->npcs[i].z) != z || g->interp.a.ev[i].sheet < 0) continue;
+        int t = trigger_of(g, i);
+        if (t != TRIG_TOUCH && t != TRIG_EVENT_TOUCH) continue;
+        last = i;
+        if (t == TRIG_EVENT_TOUCH || f->npcs[i].visible) pushable = true;
+    }
+    return !pushed || pushable ? last : -1;
+}
+
 static void face_player(SG *g, int npc) {
     SgaEvent *ev = &g->interp.a.ev[npc];
     const SgaSheet *sh = &ev->sheets[ev->sheet];
@@ -353,8 +367,8 @@ bool sga_field_input(SG *g) {
     if (px != a->lastX || pz != a->lastZ) {
         a->lastX = px;
         a->lastZ = pz;
-        int i = npc_at(g, px, pz, false);
-        if (i >= 0 && (trigger_of(g, i) == TRIG_TOUCH || trigger_of(g, i) == TRIG_EVENT_TOUCH)) {
+        int i = touch_at(g, px, pz, false);
+        if (i >= 0) {
             sga_start_event(g, i, a->ev[i].sheet);
             if (g->interp.active) return true;
         }
@@ -374,8 +388,8 @@ bool sga_field_input(SG *g) {
     }
     u32 want = dir == 0 ? KEY_UP : dir == 1 ? KEY_RIGHT : dir == 2 ? KEY_DOWN : KEY_LEFT;
     if (g->keys & want) {
-        int i = npc_at(g, tx, tz, false);
-        if (i >= 0 && (trigger_of(g, i) == TRIG_EVENT_TOUCH || (trigger_of(g, i) == TRIG_TOUCH && g->field.npcs[i].visible))) {
+        int i = touch_at(g, tx, tz, true);
+        if (i >= 0) {
             sga_start_event(g, i, a->ev[i].sheet);
             if (g->interp.active) return true;
         }
