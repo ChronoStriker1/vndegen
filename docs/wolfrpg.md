@@ -371,5 +371,8 @@ shot, save, load, pics, sys, state), which makes long play-throughs against the 
   them (its specification page's 0.5-tile wider touch) haven't been compared with the PC. In half-tile games a whole
   step from a half position, which the PC refuses (a False Myth 2 save edited to whole steps at 47,45 can turn but not
   walk), isn't refused, and a character's box is checked only where its step ends.
+- False Myth 2's dungeons and battles still hitch for a moment every few seconds in the Mac app and the iPad simulator.
+  The hitches are in drawing a few large sprite sheets while macOS has compressed much of the app's memory
+  (`docs/frame-rate.md`); a Mac or iPad with memory to spare hasn't been measured.
 - Game.dat's language byte is read only as English (5) or Japanese; the other languages' values aren't known.
 - Of the effect command's map effects only the zoom is drawn; the library uses no other.
