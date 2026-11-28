@@ -581,7 +581,7 @@ void view_load(SG *g) {
         v->slopeDir[(size_t)s->z * (size_t)m->w + (size_t)s->x] = (i16)s->kind;
         v->slopeIdx[(size_t)s->z * (size_t)m->w + (size_t)s->x] = (u8)si;
     }
-    v->border = v->look.sky == 0 && sg_player_at_least(g, 1, 8) ? 0 : BORDER;
+    v->border = v->look.sky == 0 && (v->look.sun || sg_player_at_least(g, 1, 8)) ? 0 : BORDER;
     v->chunkW = (m->w + 2 * BORDER + CHUNK - 1) / CHUNK;
     v->chunkH = (m->h + 2 * BORDER + CHUNK - 1) / CHUNK;
     v->chunkCount = v->chunkW * v->chunkH;
@@ -1023,13 +1023,14 @@ static int order_cmp(const void *a, const void *b) {
 void field_draw(SG *g) {
     double t0 = now_ms();
     Field *f = &g->field;
-    r3_begin(&g->r3, g->fb, 0xff000000u);
     View *v = g->r3.view;
+    bool skyView = v && v->ready && v->look.sky == 0 && v->look.sun && !(v->look.hasCamera && v->look.cameraKind == 1);
+    r3_begin(&g->r3, g->fb, skyView ? 0xffffffffu : 0xff000000u);
     if (!f->loaded || !v || !v->ready) return;
     pose_to_cam(&v->pose, &f->cam, g->w, g->h);
     r3_set_anim(&g->r3, (float)((v->waterMs / 125) % 8) / 8.0f);
     for (int k = 0; k < 3; k++) g->r3.tint[k] = 256;
-    if (v->look.sky == 0 && v->look.sun && !(v->look.hasCamera && v->look.cameraKind == 1)) draw_sky(g, v);
+    if (skyView) draw_sky(g, v);
     if (g->r3.x->shadow.base) {
         r3_shadow_restore(&g->r3);
         for (int i = 0; i < f->npcCount; i++)

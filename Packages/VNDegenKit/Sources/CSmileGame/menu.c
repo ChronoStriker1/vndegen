@@ -1609,7 +1609,7 @@ bool menu_frame(SG *g, u32 ms) {
     Menu *m = menu_get(g);
     if (!m) return false;
     if (m->mode == MENU_CLOSED) {
-        if (!g->interp.active && !g->pendingTransfer && g->fadeLevel <= 0 && sg_pressed(g, KEY_CANCEL)) {
+        if (!g->interp.active && !g->pendingTransfer && g->fadeLevel <= 0 && !g->interp.a.menuOff68 && !g->interp.a.menuOff77 && sg_pressed(g, KEY_CANCEL)) {
             sgb_sound(g, SND_DECIDE);
             menu_open(g);
         } else {
