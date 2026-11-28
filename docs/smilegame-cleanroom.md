@@ -1295,8 +1295,7 @@ variable 1 at 18 and the choice 話す, 陵辱する, 城に戻る. From the sam
 - `さっさと脱いで、俺の上にまたがれよ。` has three lines and a final line break. The PC shows the fourth, empty line
   as a page of its own and waits on an empty window; the runtime now does the same when a message ends with one line
   break right after a full page.
-- After a message the PC keeps the empty message window under the next choice; the runtime doesn't. The PC's
-  basement wall shows pillars that the runtime's view leaves out.
+- After a message the PC keeps the empty message window under the next choice; the runtime doesn't.
 
 ### ドラコ
 

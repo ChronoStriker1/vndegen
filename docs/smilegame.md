@@ -260,6 +260,18 @@ With the touch gamepad shown, the iPad simulator ran the cape and a slime battle
 runtime at 3.5 to 4.0 ms, the gamepad compositing cost described below. The iPad check loaded the optional places'
 saves from a copy of the game with every name's case swapped on a case-sensitive volume (`scripts/case-check.sh`).
 
+Colette's post-game, DEBUG builds of this round's branch on the Mac mini, 2026-11-27, from runner saves, no other build
+running (load 5 to 14). Target 60.
+
+| Scene | Mac app | iPad Pro 13 simulator, gamepad hidden |
+|---|---|---|
+| North Tower 15F, fourth lap | 59.1 to 59.8, 23.2 to 42.8, 2.8 to 4.7 ms | 59.2 to 59.6, 23.6 to 33.3, 2.4 to 2.8 ms |
+| Castle basement scene | 59.7 to 59.9, 36.7 to 48.2, 3.6 to 4.2 ms | 57.3 to 59.4, 11.8 to 28.5, 3.1 to 3.3 ms |
+| ドラコ's battles | 59.0 to 59.7, 19.0 to 37.5, 4.9 to 7.4 ms | 57.8 to 59.4, 13.7 to 26.5, 5.1 to 5.8 ms |
+
+With the touch gamepad shown, the iPad simulator ran the tower floor at 43 to 45 frames a second with the runtime at
+2.3 to 2.6 ms, the gamepad compositing cost described below.
+
 Colette's first release, DEBUG builds of 208c06cf on the Mac mini, 2026-11-27, measured the same way (Mac app with no
 other app or build running, load average 3 to 5; one simulator booted at a time). The world map is the cell below
 the castle where the first monster reaches the player, the battle the command list of that battle. Target 60.
@@ -342,7 +354,7 @@ were taken with the gamepad shown.
   VNDegen. On the PC it took 6 HP from each hero where VNDegen takes 1, and the PC showed ダーク's recovery from
   confusion after every action of the turn, where VNDegen recovers a fighter when its own turn comes.
 - After a message, the PC keeps an empty message window under the choice that follows; VNDegen shows the choice
-  alone. In the castle basement the PC shows pillars on the back wall that VNDegen's event-room camera leaves out.
+  alone.
 - In battles with three or four heroes the PC draws the first two a little larger than the camera alone would; the
   runtime stands them a cell forward, which puts their feet where the PC's are.
 - Particle effects are drawn from their emitter settings; the PC's flame is a little narrower and redder, and sparks
